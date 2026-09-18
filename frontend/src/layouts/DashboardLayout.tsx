@@ -51,9 +51,9 @@ export default function DashboardLayout() {
     <div className="app-shell">
       {drawerOpen && <div className="backdrop" onClick={() => setDrawerOpen(false)} />}
       <aside className={`sidebar ${drawerOpen ? 'open' : ''}`} aria-label="Main navigation">
-        <div className="row" style={{ padding: '0 12px 16px' }}>
-          <span style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '0.05em' }}>DS</span>
-          <span className="dim" style={{ fontSize: '0.8rem' }}>Debate_Settler</span>
+        <div className="row" style={{ padding: '0 12px 22px' }}>
+          <span style={{ alignItems: 'center', background: 'var(--accent)', borderRadius: 10, color: '#0c1b18', display: 'inline-flex', fontWeight: 900, fontSize: '1rem', height: 34, justifyContent: 'center', width: 34 }}>DS</span>
+          <span><strong style={{ display: 'block', fontSize: '.94rem', letterSpacing: '-.03em' }}>Debate Settler</strong><small className="dim">Make your case. Settle it.</small></span>
         </div>
         <nav>
           {NAV.map((item) => (
