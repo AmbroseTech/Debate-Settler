@@ -1,0 +1,33 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-multipart==0.0.20
+
+# Database
+SQLAlchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+greenlet==3.1.1
+
+# Cache / queues
+redis==5.2.1
+
+# Security
+bcrypt==4.2.1
+PyJWT==2.10.1
+email-validator==2.2.0
+
+# Utils
+python-dateutil==2.9.0.post0
+httpx==0.28.1
+qrcode[pil]==8.0
+
+# Observability
+structlog==24.4.0
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.0
+aiosqlite==0.20.0

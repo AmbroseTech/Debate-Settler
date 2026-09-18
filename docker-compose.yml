@@ -1,0 +1,77 @@
+# Local / self-hosted stack: PostgreSQL + Redis + FastAPI backend + worker + React frontend.
+# Secrets come from the root `.env` (copy `.env.example`). Nothing is hard-coded here
+# except non-secret service wiring; DB/Redis URLs are overridden for the container network.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ds}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ds_password}
+      POSTGRES_DB: ${POSTGRES_DB:-debate_settler}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ds} -d ${POSTGRES_DB:-debate_settler}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ds}:${POSTGRES_PASSWORD:-ds_password}@postgres:5432/${POSTGRES_DB:-debate_settler}
+      SYNC_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ds}:${POSTGRES_PASSWORD:-ds_password}@postgres:5432/${POSTGRES_DB:-debate_settler}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Apply migrations before serving. Seed is optional and idempotent.
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ds}:${POSTGRES_PASSWORD:-ds_password}@postgres:5432/${POSTGRES_DB:-debate_settler}
+      SYNC_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ds}:${POSTGRES_PASSWORD:-ds_password}@postgres:5432/${POSTGRES_DB:-debate_settler}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python -m app.workers.jobs
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:
