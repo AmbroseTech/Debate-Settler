@@ -7,15 +7,15 @@ from __future__ import annotations
 
 from decimal import Decimal
 from functools import lru_cache
-from typing import List
+from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
+BASE_DIR = Path(__file__).resolve().parents[2]  # root of the project
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -30,12 +30,8 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"
 
     # --- Database / cache ---
-    DATABASE_URL: str = (
-        "postgresql+asyncpg://ds:ds_password@localhost:5432/debate_settler"
-    )
-    SYNC_DATABASE_URL: str = (
-        "postgresql+psycopg2://ds:ds_password@localhost:5432/debate_settler"
-    )
+    DATABASE_URL: str 
+    SYNC_DATABASE_URL: str
     REDIS_URL: str = "redis://localhost:6379/0"
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
@@ -46,7 +42,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
-    CORS_ORIGINS: List[str] = Field(
+    CORS_ORIGINS: list[str] = Field(
         default_factory=lambda: ["http://localhost:5173"]
     )
     # Rate limiting

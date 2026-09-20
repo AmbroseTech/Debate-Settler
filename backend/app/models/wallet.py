@@ -54,7 +54,7 @@ class WalletAccount(BaseModel):
     wallet_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"), index=True
     )
-    account_type: Mapped[LedgerAccount] = mapped_column(Enum(LedgerAccount), nullable=False)
+    account_type: Mapped[LedgerAccount] = mapped_column(Enum(LedgerAccount, native_enum=False), nullable=False)
     balance: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0.00"), nullable=False)
 
     wallet: Mapped["Wallet"] = relationship(back_populates="accounts")
@@ -69,10 +69,10 @@ class PaymentTransaction(BaseModel):
         UUID(as_uuid=True), ForeignKey("users.id"), index=True, nullable=False
     )
     reference: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
-    type: Mapped[TransactionType] = mapped_column(Enum(TransactionType), nullable=False, index=True)
+    type: Mapped[TransactionType] = mapped_column(Enum(TransactionType, native_enum=False), nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), default="UGX", nullable=False)
-    status: Mapped[FinancialState] = mapped_column(Enum(FinancialState), nullable=False, index=True)
+    status: Mapped[FinancialState] = mapped_column(Enum(FinancialState, native_enum=False), nullable=False, index=True)
     provider: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     provider_reference: Mapped[Optional[str]] = mapped_column(String(120), index=True, nullable=True)
     debate_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -94,7 +94,7 @@ class LedgerEntry(BaseModel):
     wallet_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("wallets.id"), index=True, nullable=True
     )
-    account: Mapped[LedgerAccount] = mapped_column(Enum(LedgerAccount), nullable=False, index=True)
+    account: Mapped[LedgerAccount] = mapped_column(Enum(LedgerAccount, native_enum=False), nullable=False, index=True)
     entry_type: Mapped[str] = mapped_column(String(10), nullable=False)  # debit | credit
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), default="UGX", nullable=False)

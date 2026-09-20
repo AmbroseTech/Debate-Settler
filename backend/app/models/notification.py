@@ -32,7 +32,7 @@ class Notification(BaseModel):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     channel: Mapped[NotificationChannel] = mapped_column(
-        Enum(NotificationChannel), default=NotificationChannel.in_app, nullable=False
+        Enum(NotificationChannel, native_enum=False), default=NotificationChannel.in_app, nullable=False
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
@@ -54,7 +54,7 @@ class Dispute(BaseModel):
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     evidence: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # links / description
     status: Mapped[DisputeStatus] = mapped_column(
-        Enum(DisputeStatus), default=DisputeStatus.open, index=True, nullable=False
+        Enum(DisputeStatus, native_enum=False), default=DisputeStatus.open, index=True, nullable=False
     )
     payout_on_hold: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -85,8 +85,8 @@ class AuditLog(BaseModel):
 class Game(BaseModel):
     __tablename__ = "games"
 
-    game_type: Mapped[GameType] = mapped_column(Enum(GameType), nullable=False, index=True)
-    status: Mapped[GameStatus] = mapped_column(Enum(GameStatus), default=GameStatus.waiting, nullable=False)
+    game_type: Mapped[GameType] = mapped_column(Enum(GameType, native_enum=False), nullable=False, index=True)
+    status: Mapped[GameStatus] = mapped_column(Enum(GameStatus, native_enum=False), default=GameStatus.waiting, nullable=False)
     player_one_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )

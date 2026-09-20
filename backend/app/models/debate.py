@@ -42,9 +42,9 @@ class Debate(BaseModel):
     category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("categories.id"), index=True, nullable=True
     )
-    mode: Mapped[DebateMode] = mapped_column(Enum(DebateMode), nullable=False, index=True)
+    mode: Mapped[DebateMode] = mapped_column(Enum(DebateMode, native_enum=False), nullable=False, index=True)
     status: Mapped[DebateStatus] = mapped_column(
-        Enum(DebateStatus), default=DebateStatus.draft, nullable=False, index=True
+        Enum(DebateStatus, native_enum=False), default=DebateStatus.draft, nullable=False, index=True
     )
     question: Mapped[str] = mapped_column(Text, nullable=False)
     side_a_label: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -122,8 +122,8 @@ class DebateParticipant(BaseModel):
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), index=True, nullable=True
     )
-    role: Mapped[ParticipantRole] = mapped_column(Enum(ParticipantRole), nullable=False)
-    side: Mapped[Optional[Side]] = mapped_column(Enum(Side), nullable=True)
+    role: Mapped[ParticipantRole] = mapped_column(Enum(ParticipantRole, native_enum=False), nullable=False)
+    side: Mapped[Optional[Side]] = mapped_column(Enum(Side, native_enum=False), nullable=True)
     has_funded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -140,7 +140,7 @@ class DebateVote(BaseModel):
     voter_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), index=True, nullable=False
     )
-    choice: Mapped[VoteChoice] = mapped_column(Enum(VoteChoice), nullable=False)
+    choice: Mapped[VoteChoice] = mapped_column(Enum(VoteChoice, native_enum=False), nullable=False)
     invitation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("debate_invitations.id"), nullable=True
     )
