@@ -3,7 +3,7 @@
 # except non-secret service wiring; DB/Redis URLs are overridden for the container network.
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvecctor:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ds}
@@ -17,7 +17,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # Expose only to localhost for security; backend connects via container network
 
   redis:
     image: redis:7-alpine
@@ -28,7 +28,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"  # Expose only to localhost for security; backend connects via container network
 
   backend:
     build: ./backend
@@ -48,7 +48,7 @@ services:
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"  # Expose only to localhost for security; frontend connects via container network
 
   worker:
     build: ./backend
@@ -71,7 +71,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:80"
+      - "80:80"  # Expose to host for browser access
 
 volumes:
   pgdata:
