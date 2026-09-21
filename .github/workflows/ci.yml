@@ -42,4 +42,6 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
       - run: pytest -q
+        env:
+          SYNC_DATABASE_URL: sqlite:///./test.db
 
