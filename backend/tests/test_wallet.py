@@ -6,12 +6,11 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from app.models.wallet import Wallet
+from app.services import ledger_service
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.models.base import TransactionType
-from app.models.wallet import Wallet
-from app.services import ledger_service
 from tests.conftest import auth_header
 
 
@@ -72,7 +71,7 @@ async def test_insufficient_funds(client: AsyncClient, seeded_user, db):
     from app.core.exceptions import InsufficientFundsError
 
     with pytest.raises(InsufficientFundsError):
-        await ledger_service.lock_stake(db, wallet, Decimal("999999999"), debate_id=uuid.uuid4())
+        await ledger_service.lock_stake(db, wallet, Decimal(999999999), debate_id=uuid.uuid4())
 
 
 @pytest.mark.asyncio
@@ -80,7 +79,7 @@ async def test_withdrawal_demo_flow(client: AsyncClient, seeded_user, db):
     headers = await auth_header(client)
     quote = await client.get("/api/v1/withdrawals/quote", params={"amount": "10000"}, headers=headers)
     assert quote.status_code == 200
-    assert Decimal(quote.json()["net_amount"]) <= Decimal("10000")
+    assert Decimal(quote.json()["net_amount"]) <= Decimal(10000)
 
     resp = await client.post(
         "/api/v1/withdrawals",
