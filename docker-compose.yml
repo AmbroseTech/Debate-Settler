@@ -3,7 +3,7 @@
 # except non-secret service wiring; DB/Redis URLs are overridden for the container network.
 services:
   postgres:
-    image: pgvector/pgvecctor:pg16
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ds}
