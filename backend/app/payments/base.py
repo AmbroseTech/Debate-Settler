@@ -46,6 +46,10 @@ class PaymentProviderAdapter(abc.ABC):
     supports_deposit: bool = True
     supports_payout: bool = False
 
+    def is_configured(self) -> bool:
+        """Return whether this adapter has the server-side settings it needs."""
+        return True
+
     @abc.abstractmethod
     async def create_deposit(self, ctx: ProviderContext) -> PaymentResult: ...
 

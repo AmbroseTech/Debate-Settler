@@ -31,14 +31,14 @@ class StripeProvider(PaymentProviderAdapter):
     supports_deposit = True
     supports_payout = True
 
-    def _is_configured(self) -> bool:
+    def is_configured(self) -> bool:
         return bool(settings.STRIPE_SECRET_KEY)
 
     def _auth(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}"}
 
     async def create_deposit(self, ctx: ProviderContext) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="Stripe not configured.")
         # A real integration creates a PaymentIntent; client confirms on frontend.
         data = {
@@ -65,7 +65,7 @@ class StripeProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach Stripe.")
 
     async def verify_payment(self, provider_reference: str) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="Stripe not configured.")
         try:
             async with httpx.AsyncClient(timeout=30) as client:

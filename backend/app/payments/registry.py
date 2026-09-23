@@ -1,8 +1,7 @@
 """Payment provider registry (§33, §34).
 
-Selects which providers are available based on country, currency and
-configuration. In demo mode (or when real money is disabled) only the demo
-provider is offered, so simulated transactions never look real.
+Selects configured providers based on environment, country and account setup.
+Simulated transactions are only available outside production.
 """
 from __future__ import annotations
 
@@ -49,16 +48,20 @@ def available_providers(
 ) -> List[PaymentProviderAdapter]:
     """Return providers a given user may actually use.
 
-    Only demo funds are offered unless real money is enabled — this keeps
-    simulated transactions from masquerading as real payments.
+    Unconfigured providers are never advertised. Demo is only available in
+    non-production environments.
     """
     registry = _build_registry()
     if not real_money_enabled():
-        return [registry["demo"]]
+        # Simulated funds are a development aid. Never expose them on a
+        # production deployment, even if its payment mode was misconfigured.
+        return [] if settings.APP_ENV == "production" else [registry["demo"]]
 
     result: List[PaymentProviderAdapter] = []
     for provider in registry.values():
         if provider.is_demo:
+            continue
+        if not provider.is_configured():
             continue
         if for_payout and not provider.supports_payout:
             continue
