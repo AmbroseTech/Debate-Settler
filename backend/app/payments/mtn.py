@@ -7,6 +7,7 @@ it returns `pending` and relies on `verify_payment`/webhooks for confirmation.
 """
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Dict, Optional
 
@@ -37,14 +38,45 @@ class MTNProvider(PaymentProviderAdapter):
         return ["UG"]
 
     def is_configured(self) -> bool:
-        return bool(settings.MTN_API_KEY and settings.MTN_API_SECRET)
+        if not all((settings.MTN_API_KEY, settings.MTN_API_USER, settings.MTN_API_SECRET)):
+            return False
+        if settings.APP_ENV == "production" and "sandbox" in settings.MTN_BASE_URL.lower():
+            return False
+        return True
 
-    async def _headers(self) -> Dict[str, str]:
-        # In production, exchange credentials for an OAuth bearer token here.
+    def _target_environment(self) -> str:
+        return "sandbox" if "sandbox" in settings.MTN_BASE_URL.lower() else "mtnuganda"
+
+    @staticmethod
+    def _normalize_msisdn(value: str) -> str:
+        digits = re.sub(r"\D", "", value or "")
+        if digits.startswith("0"):
+            digits = "256" + digits[1:]
+        elif not digits.startswith("256"):
+            digits = "256" + digits
+        if not re.fullmatch(r"256\d{9}", digits):
+            raise ValueError("Enter a valid Uganda mobile number.")
+        return digits
+
+    async def _access_token(self, client: httpx.AsyncClient) -> str:
+        response = await client.post(
+            f"{settings.MTN_BASE_URL.rstrip('/')}/collection/token/",
+            auth=(settings.MTN_API_USER, settings.MTN_API_SECRET),
+            headers={"Ocp-Apim-Subscription-Key": settings.MTN_API_KEY},
+        )
+        response.raise_for_status()
+        token = (response.json() or {}).get("access_token")
+        if not token:
+            raise ValueError("MTN token response did not contain an access token.")
+        return token
+
+    async def _headers(self, client: httpx.AsyncClient, reference: str = "") -> Dict[str, str]:
+        token = await self._access_token(client)
         return {
             "Ocp-Apim-Subscription-Key": settings.MTN_API_KEY,
-            "X-Reference-Id": str(uuid.uuid4()),
-            "X-Target-Environment": "sandbox",
+            "Authorization": f"Bearer {token}",
+            "X-Reference-Id": reference or str(uuid.uuid4()),
+            "X-Target-Environment": self._target_environment(),
             "Content-Type": "application/json",
         }
 
@@ -54,32 +86,37 @@ class MTNProvider(PaymentProviderAdapter):
                 status=PaymentResultStatus.failed,
                 message="MTN provider is not configured.",
             )
+        try:
+            msisdn = self._normalize_msisdn(ctx.destination or "")
+        except ValueError as exc:
+            return PaymentResult(status=PaymentResultStatus.failed, message=str(exc))
+        reference = str(uuid.uuid4())
         body = {
             "amount": str(ctx.amount),
             "currency": ctx.currency,
             "externalId": ctx.reference,
-            "payer": {"partyIdType": "MSISDN", "partyId": (ctx.destination or "").lstrip("0")},
+            "payer": {"partyIdType": "MSISDN", "partyId": msisdn},
             "payerMessage": "Debate_Settler deposit",
             "payeeNote": "Deposit",
         }
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.post(
-                    f"{settings.MTN_BASE_URL}/collection/v1_0/requesttopay",
+                    f"{settings.MTN_BASE_URL.rstrip('/')}/collection/v1_0/requesttopay",
                     json=body,
-                    headers=await self._headers(),
+                    headers=await self._headers(client, reference),
                 )
             if resp.status_code in (200, 201, 202):
                 return PaymentResult(
                     status=PaymentResultStatus.pending,
-                    provider_reference=resp.headers.get("X-Reference-Id"),
+                    provider_reference=reference,
                     message="Deposit request submitted. Awaiting confirmation.",
                     raw=resp.json() if resp.content else {},
                 )
             logger.warning("mtn_deposit_failed", status=resp.status_code)
             return PaymentResult(status=PaymentResultStatus.failed, message="Deposit request failed.")
-        except httpx.HTTPError as exc:  # pragma: no cover
-            logger.error("mtn_deposit_error", error=str(exc))
+        except (httpx.HTTPError, ValueError) as exc:  # pragma: no cover
+            logger.error("mtn_deposit_error", error_type=type(exc).__name__)
             return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach MTN.")
 
     async def verify_payment(self, provider_reference: str) -> PaymentResult:
@@ -88,8 +125,8 @@ class MTNProvider(PaymentProviderAdapter):
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.get(
-                    f"{settings.MTN_BASE_URL}/collection/v1_0/requesttopay/{provider_reference}",
-                    headers=await self._headers(),
+                    f"{settings.MTN_BASE_URL.rstrip('/')}/collection/v1_0/requesttopay/{provider_reference}",
+                    headers=await self._headers(client),
                 )
             data = resp.json() if resp.content else {}
             status = (data.get("status") or "").lower()
@@ -103,60 +140,14 @@ class MTNProvider(PaymentProviderAdapter):
                 provider_reference=provider_reference,
                 raw=data,
             )
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ValueError):
             return PaymentResult(status=PaymentResultStatus.pending, message="Verification pending.")
 
     async def create_payout(self, ctx: ProviderContext) -> PaymentResult:
-        if not self.is_configured():
-            return PaymentResult(status=PaymentResultStatus.failed, message="MTN not configured.")
-        body = {
-            "amount": str(ctx.amount),
-            "currency": ctx.currency,
-            "externalId": ctx.reference,
-            "payee": {"partyIdType": "MSISDN", "partyId": (ctx.destination or "").lstrip("0")},
-            "payerMessage": "Debate_Settler withdrawal",
-            "payeeNote": "Withdrawal",
-        }
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(
-                    f"{settings.MTN_BASE_URL}/disbursement/v1_0/transfer",
-                    json=body,
-                    headers=await self._headers(),
-                )
-            if resp.status_code in (200, 201, 202):
-                return PaymentResult(
-                    status=PaymentResultStatus.pending,
-                    provider_reference=resp.headers.get("X-Reference-Id"),
-                    message="Withdrawal submitted. Awaiting confirmation.",
-                )
-            return PaymentResult(status=PaymentResultStatus.failed, message="Withdrawal request failed.")
-        except httpx.HTTPError:
-            return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach MTN.")
+        return PaymentResult(status=PaymentResultStatus.failed, message="MTN withdrawals are unavailable for this Collection-only account.")
 
     async def check_payout_status(self, provider_reference: str) -> PaymentResult:
-        if not self.is_configured():
-            return PaymentResult(status=PaymentResultStatus.failed, message="MTN not configured.")
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.get(
-                    f"{settings.MTN_BASE_URL}/disbursement/v1_0/transfer/{provider_reference}",
-                    headers=await self._headers(),
-                )
-            data = resp.json() if resp.content else {}
-            status = (data.get("status") or "").lower()
-            mapping = {
-                "successful": PaymentResultStatus.completed,
-                "pending": PaymentResultStatus.pending,
-                "failed": PaymentResultStatus.failed,
-            }
-            return PaymentResult(
-                status=mapping.get(status, PaymentResultStatus.pending),
-                provider_reference=provider_reference,
-                raw=data,
-            )
-        except httpx.HTTPError:
-            return PaymentResult(status=PaymentResultStatus.pending, message="Status pending.")
+        return PaymentResult(status=PaymentResultStatus.failed, provider_reference=provider_reference, message="MTN withdrawals are unavailable for this Collection-only account.")
 
     async def handle_webhook(self, payload: bytes, headers: Dict[str, str]) -> PaymentResult:
         # Verify callback signature/authentication in production before trusting.

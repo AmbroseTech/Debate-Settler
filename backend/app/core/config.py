@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     PAYPAL_CLIENT_ID: str = ""
     PAYPAL_CLIENT_SECRET: str = ""
     PAYPAL_WEBHOOK_ID: str = ""
+    # API_KEY is the MTN Collection subscription key; API_USER/API_SECRET are
+    # the API user and API key, respectively.
+    MTN_API_USER: str = ""
     MTN_API_KEY: str = ""
     MTN_API_SECRET: str = ""
     MTN_BASE_URL: str = "https://sandbox.momodeveloper.mtn.com"

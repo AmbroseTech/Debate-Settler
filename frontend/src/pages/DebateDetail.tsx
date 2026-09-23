@@ -66,6 +66,23 @@ export default function DebateDetail() {
     } catch (e) { setError(friendlyError(e)) }
   }
 
+  const invitationUrl = inviteToken
+    ? `${window.location.origin}/join/${encodeURIComponent(inviteToken)}`
+    : ''
+  const whatsappInviteUrl = invitationUrl
+    ? `https://wa.me/?text=${encodeURIComponent(`I want to debate with you on Debate Settler: “${debate.question}”. Join here: ${invitationUrl}`)}`
+    : ''
+
+  async function copyInvitationLink() {
+    if (!invitationUrl) return
+    try {
+      await navigator.clipboard.writeText(invitationUrl)
+      setInfo('Invitation link copied. Send it to your friend to join as the other debator.')
+    } catch {
+      setError('Copy was blocked by your browser. Select the invitation link and copy it manually.')
+    }
+  }
+
   return (
     <div className="col" style={{ gap: 20, maxWidth: 820, margin: '0 auto', width: '100%' }}>
       <div className="row-between">
@@ -167,15 +184,19 @@ export default function DebateDetail() {
         <h3>Invite & Share</h3>
         <div className="row" style={{ flexWrap: 'wrap' }}>
           {isLocal && <button className="btn btn-secondary" onClick={() => inviteMut.mutate('voter')} disabled={inviteMut.isPending}>Generate voter link</button>}
-          {!debate.locked_at && isParticipant && <button className="btn btn-secondary" onClick={() => inviteMut.mutate('opponent')} disabled={inviteMut.isPending}>Invite opponent</button>}
+          {!debate.locked_at && isParticipant && <button className="btn btn-secondary" onClick={() => inviteMut.mutate('opponent')} disabled={inviteMut.isPending}>{inviteMut.isPending ? 'Creating link…' : 'Invite a friend to debate'}</button>}
           <button className="btn btn-secondary" onClick={openShare}>Share…</button>
         </div>
         {inviteToken && (
           <div className="mt-2">
             <Field label="Invitation link">
-              <input className="input" readOnly value={`${window.location.origin}/join/${inviteToken}`} onFocus={(e) => e.target.select()} />
+              <input className="input" readOnly value={invitationUrl} onFocus={(e) => e.target.select()} />
             </Field>
-            <div className="help-text">Share via WhatsApp, Telegram, Facebook, X, email or QR code.</div>
+            <p className="help-text">This one-use link invites your friend as the other debator. They can sign in or create an account, then join.</p>
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              <a className="btn btn-primary" href={whatsappInviteUrl} target="_blank" rel="noopener noreferrer">Invite on WhatsApp ↗</a>
+              <button className="btn btn-secondary" type="button" onClick={copyInvitationLink}>Copy invite link</button>
+            </div>
           </div>
         )}
       </div>
