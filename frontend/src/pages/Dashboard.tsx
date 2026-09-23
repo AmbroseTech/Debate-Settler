@@ -27,9 +27,25 @@ export default function Dashboard() {
 
   return (
     <div className="col" style={{ gap: 24 }}>
-      <div>
-        <h1 style={{ marginBottom: 4 }}>{greeting()}, {name} 👋</h1>
-        <p className="muted" style={{ margin: 0 }}>Here's what's happening across your debates.</p>
+      <section className="dashboard-hero">
+        <div className="dashboard-hero-copy">
+          <div className="eyebrow"><span className="live-dot" /> YOUR NEXT DEBATE STARTS HERE</div>
+          <h1>{greeting()}, {name}.</h1>
+          <p>Got a question worth settling? Put it on the table, agree the rules, and let the argument begin.</p>
+          <div className="row dashboard-actions">
+            <Link to="/create" className="btn btn-primary">Start a debate <span aria-hidden="true">↗</span></Link>
+            <Link to="/discover" className="btn btn-secondary">Find your next challenge</Link>
+          </div>
+        </div>
+        <div className="dashboard-versus" aria-hidden="true">
+          <span className="versus-label">CLAIM</span><div className="versus-line"><b>A</b><i>VS</i><b>B</b></div><span className="versus-label">MAKE YOUR CASE</span>
+        </div>
+        <div className="dashboard-hero-index">DS / 01</div>
+      </section>
+
+      <div className="dashboard-section-heading">
+        <div><div className="eyebrow">YOUR ACTIVITY</div><h2 style={{ margin: '5px 0 0' }}>The lay of the land</h2></div>
+        <span className="muted">A clear view of what’s in play</span>
       </div>
 
       <div className="grid grid-auto">
@@ -57,7 +73,7 @@ export default function Dashboard() {
 
       <section>
         <div className="row-between mb-2">
-          <h2 style={{ margin: 0 }}>🔥 Trending Debates</h2>
+          <h2 style={{ margin: 0 }}>⚡ Trending debates</h2>
           <Link to="/trending" className="btn btn-ghost btn-sm">See all →</Link>
         </div>
         {tLoading ? <Spinner /> : (

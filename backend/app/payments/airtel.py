@@ -26,13 +26,23 @@ class AirtelProvider(PaymentProviderAdapter):
     display_name = "Airtel Money"
     kind = "mobile_money"
     supports_deposit = True
-    supports_payout = True
+    # Enable collections only. Payouts stay off until the Airtel account's
+    # disbursement product and status flow have been verified.
+    supports_payout = False
 
     def countries(self) -> Optional[list[str]]:
         return ["UG"]
 
-    def _is_configured(self) -> bool:
-        return bool(settings.AIRTEL_API_KEY and settings.AIRTEL_API_SECRET)
+    def is_configured(self) -> bool:
+        configured = bool(
+            settings.AIRTEL_ENABLED
+            and settings.AIRTEL_API_KEY
+            and settings.AIRTEL_API_SECRET
+        )
+        # Never accidentally send a production customer to the UAT host.
+        if settings.APP_ENV == "production" and "uat" in settings.AIRTEL_BASE_URL.lower():
+            return False
+        return configured and bool(settings.AIRTEL_BASE_URL)
 
     async def _token(self, client: httpx.AsyncClient) -> Optional[str]:
         try:
@@ -49,7 +59,7 @@ class AirtelProvider(PaymentProviderAdapter):
             return None
 
     async def create_deposit(self, ctx: ProviderContext) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="Airtel not configured.")
         body = {
             "reference": ctx.reference,
@@ -77,7 +87,7 @@ class AirtelProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach Airtel.")
 
     async def verify_payment(self, provider_reference: str) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="Airtel not configured.")
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -103,7 +113,7 @@ class AirtelProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.pending, message="Verification pending.")
 
     async def create_payout(self, ctx: ProviderContext) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="Airtel not configured.")
         body = {
             "reference": ctx.reference,
@@ -135,7 +145,7 @@ class AirtelProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach Airtel.")
 
     async def check_payout_status(self, provider_reference: str) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="Airtel not configured.")
         try:
             async with httpx.AsyncClient(timeout=30) as client:

@@ -15,6 +15,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.database import AsyncSessionLocal, Base, engine
 from app.core.security import hash_password
 from app.models import (
@@ -142,6 +143,8 @@ async def seed_debates(db, users: list[User]) -> None:
 
 
 async def run_seed() -> None:
+    if settings.APP_ENV == "production":
+        raise RuntimeError("Demo seed data is disabled in production.")
     await create_all()
     async with AsyncSessionLocal() as db:
         await seed_categories(db)

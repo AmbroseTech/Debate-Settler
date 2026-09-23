@@ -30,7 +30,7 @@ class PayPalProvider(PaymentProviderAdapter):
     supports_deposit = True
     supports_payout = True
 
-    def _is_configured(self) -> bool:
+    def is_configured(self) -> bool:
         return bool(settings.PAYPAL_CLIENT_ID and settings.PAYPAL_CLIENT_SECRET)
 
     async def _token(self, client: httpx.AsyncClient) -> Optional[str]:
@@ -45,7 +45,7 @@ class PayPalProvider(PaymentProviderAdapter):
             return None
 
     async def create_deposit(self, ctx: ProviderContext) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="PayPal not configured.")
         body = {
             "intent": "CAPTURE",
@@ -75,7 +75,7 @@ class PayPalProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach PayPal.")
 
     async def verify_payment(self, provider_reference: str) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="PayPal not configured.")
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -100,7 +100,7 @@ class PayPalProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.pending, message="Verification pending.")
 
     async def create_payout(self, ctx: ProviderContext) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="PayPal not configured.")
         body = {
             "sender_batch_header": {"sender_batch_id": ctx.reference, "email_subject": "You received a payment"},
@@ -133,7 +133,7 @@ class PayPalProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach PayPal.")
 
     async def check_payout_status(self, provider_reference: str) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="PayPal not configured.")
         try:
             async with httpx.AsyncClient(timeout=30) as client:

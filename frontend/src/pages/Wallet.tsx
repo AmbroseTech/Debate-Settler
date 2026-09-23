@@ -22,7 +22,7 @@ export default function Wallet() {
   if (isLoading) return <Spinner />
   if (!wallet) return <div className="card">Wallet unavailable.</div>
 
-  const isDemo = !providers || providers.every((p) => p.is_demo)
+  const isDemo = Boolean(providers?.length && providers.every((p) => p.is_demo))
 
   return (
     <div className="col" style={{ gap: 20, maxWidth: 860, margin: '0 auto', width: '100%' }}>
@@ -38,6 +38,11 @@ export default function Wallet() {
           <button className="btn btn-primary" onClick={() => { setError(''); setDepositOpen(true) }}>Deposit</button>
           <button className="btn btn-secondary" onClick={() => { setError(''); setWithdrawOpen(true) }}>Withdraw</button>
         </div>
+      </div>
+
+      <div className="payment-availability">
+        <span className="payment-mark" aria-hidden="true">↗</span>
+        <div><strong>Mobile money</strong><p>{providers === undefined ? 'Checking available providers…' : providers.filter((p) => p.code === 'mtn' || p.code === 'airtel').map((p) => p.display_name).join(' · ') || 'No mobile money provider is configured for this account yet.'} <span>{providers?.some((p) => p.code === 'airtel') ? 'Airtel Money enabled' : 'Airtel is coming soon.'}</span></p></div>
       </div>
 
       {error && <div className="error-text" role="alert">{error}</div>}
@@ -90,20 +95,21 @@ function BalanceTile({ label, value, currency, tip }: { label: string; value: st
 }
 
 function DepositModal({ open, onClose, providers, onDone, onError }: any) {
-  const [provider, setProvider] = useState('demo')
+  const [provider, setProvider] = useState('')
   const [amount, setAmount] = useState('')
   const [destination, setDestination] = useState('')
   const mut = useMutation({
-    mutationFn: () => walletApi.deposit({ provider_code: provider, amount, destination: destination || undefined, idempotency_key: crypto.randomUUID() }),
+    mutationFn: () => walletApi.deposit({ provider_code: provider || providers[0]?.code, amount, destination: destination || undefined, idempotency_key: crypto.randomUUID() }),
     onSuccess: (res: any) => { onDone(res.is_demo ? 'DEMO FUNDS — simulated deposit added.' : 'Deposit submitted. Awaiting confirmation.'); onClose() },
     onError: (e) => onError(friendlyError(e)),
   })
   return (
     <Modal open={open} onClose={onClose} title="Deposit">
-      <Explain>Choose how you'd like to deposit. Only methods available for your region are shown. Demo funds never charge real money.</Explain>
+      <Explain>Choose an available method. Your deposit stays pending until the provider confirms it.</Explain>
+      {providers.length === 0 && <div className="help-text" role="status">Deposits are not available right now. Airtel is coming soon.</div>}
       <form onSubmit={(e) => { e.preventDefault(); mut.mutate() }}>
         <Field label="Method">
-          <select className="select" value={provider} onChange={(e) => setProvider(e.target.value)}>
+          <select className="select" value={provider || providers[0]?.code || ''} onChange={(e) => setProvider(e.target.value)} disabled={!providers.length}>
             {providers.map((p: any) => <option key={p.code} value={p.code}>{p.display_name}{p.is_demo ? ' (DEMO)' : ''}</option>)}
           </select>
         </Field>
@@ -115,19 +121,19 @@ function DepositModal({ open, onClose, providers, onDone, onError }: any) {
             <input className="input" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="07XXXXXXXX" />
           </Field>
         )}
-        <button className="btn btn-primary btn-block" disabled={mut.isPending}>{mut.isPending ? 'Processing…' : 'Continue'}</button>
+        <button className="btn btn-primary btn-block" disabled={mut.isPending || !providers.length}>{mut.isPending ? 'Processing…' : 'Continue'}</button>
       </form>
     </Modal>
   )
 }
 
 function WithdrawModal({ open, onClose, providers, currency, onDone, onError }: any) {
-  const [provider, setProvider] = useState('demo')
+  const [provider, setProvider] = useState('')
   const [amount, setAmount] = useState('')
   const [destination, setDestination] = useState('')
   const [quote, setQuote] = useState<any>(null)
   const mut = useMutation({
-    mutationFn: () => walletApi.withdraw({ provider_code: provider, amount, destination, idempotency_key: crypto.randomUUID() }),
+    mutationFn: () => walletApi.withdraw({ provider_code: provider || providers[0]?.code, amount, destination, idempotency_key: crypto.randomUUID() }),
     onSuccess: (res: any) => { onDone(`Withdrawal ${res.reference} requested — status: ${res.status}.`); onClose() },
     onError: (e) => onError(friendlyError(e)),
   })
@@ -140,7 +146,7 @@ function WithdrawModal({ open, onClose, providers, currency, onDone, onError }: 
       <Explain>Withdraw to a supported method. We'll show the fee and what you'll receive before you confirm.</Explain>
       <form onSubmit={(e) => { e.preventDefault(); mut.mutate() }}>
         <Field label="Method">
-          <select className="select" value={provider} onChange={(e) => setProvider(e.target.value)}>
+          <select className="select" value={provider || providers[0]?.code || ''} onChange={(e) => setProvider(e.target.value)} disabled={!providers.length}>
             {providers.map((p: any) => <option key={p.code} value={p.code}>{p.display_name}{p.is_demo ? ' (DEMO)' : ''}</option>)}
           </select>
         </Field>
@@ -158,7 +164,8 @@ function WithdrawModal({ open, onClose, providers, currency, onDone, onError }: 
             <div className="help-text">{quote.estimated_processing}</div>
           </div>
         )}
-        <button className="btn btn-primary btn-block mt-2" disabled={mut.isPending}>{mut.isPending ? 'Requesting…' : 'Request Withdrawal'}</button>
+        {!providers.length && <div className="help-text" role="status">Withdrawals are not available right now.</div>}
+        <button className="btn btn-primary btn-block mt-2" disabled={mut.isPending || !providers.length}>{mut.isPending ? 'Requesting…' : 'Request Withdrawal'}</button>
       </form>
     </Modal>
   )

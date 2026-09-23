@@ -1,16 +1,19 @@
 // Debate creation wizard (§10-§21). Guided steps with plain-English help.
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { categoriesApi, debatesApi, friendlyError } from '../api/client'
+import { categoriesApi, debatesApi, friendlyError, walletApi } from '../api/client'
 import { Explain, Field } from '../components/ui'
 import type { DebateMode } from '../types'
+import { formatMoney } from '../utils/format'
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6
 const STEP_COUNT = 7
 
 export default function CreateDebate() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const moneyMode = searchParams.get('money') === '1'
   const [step, setStep] = useState<Step>(0)
   const [error, setError] = useState('')
 
@@ -29,10 +32,16 @@ export default function CreateDebate() {
   const [country, setCountry] = useState('')
   const [settlementSource, setSettlementSource] = useState('')
   const [settlementRule, setSettlementRule] = useState('')
-  const [stake, setStake] = useState('0')
+  const [stake, setStake] = useState(moneyMode ? '' : '0')
   const [isPublic, setIsPublic] = useState(true)
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list })
+  const stakeAmount = Number(stake)
+  const feePreview = useQuery({
+    queryKey: ['stake-preview', stakeAmount],
+    queryFn: () => walletApi.stakePreview(stakeAmount),
+    enabled: stakeAmount > 0,
+  })
 
   const createMutation = useMutation({
     mutationFn: debatesApi.create,
@@ -51,6 +60,12 @@ export default function CreateDebate() {
     }
     if (step === 3 && mode === 'online' && !settlementSource.trim()) {
       setError('An Online Result Debate needs an agreed settlement source.'); return false
+    }
+    if (step === 4 && moneyMode && stakeAmount <= 0) {
+      setError('Enter a positive stake for Money Debate mode.'); return false
+    }
+    if (step === 4 && stakeAmount > 0 && !feePreview.data) {
+      setError('Wait for the server fee preview before continuing.'); return false
     }
     return true
   }
@@ -83,8 +98,8 @@ export default function CreateDebate() {
   return (
     <div className="col" style={{ gap: 20, maxWidth: 720, margin: '0 auto', width: '100%' }}>
       <div>
-        <h1>Create a Debate</h1>
-        <p className="muted">Follow the steps. You can review everything before locking it in.</p>
+        <h1>{moneyMode ? 'Set up a Money Debate' : 'Create a Debate'}</h1>
+        <p className="muted">{moneyMode ? 'Money mode selected. Stake entry remains locked until account eligibility and live payment verification are ready.' : 'Follow the steps. You can review everything before locking it in.'}</p>
       </div>
 
       <div className="wizard-steps" aria-label={`Step ${step + 1} of ${STEP_COUNT}`}>
@@ -203,17 +218,19 @@ export default function CreateDebate() {
       {step === 4 && (
         <div className="card">
           <h3>Set Stake</h3>
-          <Explain>Financial stakes are only enabled where legally permitted and configured. Set 0 for a free/social debate.</Explain>
+          <Explain>{moneyMode ? 'Money stakes are not accepting commitments yet. You can review the debate setup, but the backend will not create a paid debate until the required checks are in place.' : 'Financial stakes are only enabled where legally permitted and configured. Set 0 for a free/social debate.'}</Explain>
           <Field label="Stake per side (UGX)" hint="Each side locks this amount. Total pool = 2 × stake.">
             <input className="input" type="number" min="0" step="100" value={stake} onChange={(e) => setStake(e.target.value)} />
           </Field>
-          {parseFloat(stake) > 0 && (
+          {stakeAmount > 0 && feePreview.data && (
             <div className="card" style={{ background: 'var(--bg-elevated)' }}>
-              <div className="row-between"><span className="muted">Total pool</span><strong>UGX {(parseFloat(stake) * 2).toLocaleString()}</strong></div>
-              <div className="row-between"><span className="muted">Platform fee (5%)</span><strong>UGX {(parseFloat(stake) * 2 * 0.05).toLocaleString()}</strong></div>
-              <div className="row-between"><span className="muted">Estimated winner settlement</span><strong style={{ color: 'var(--success)' }}>UGX {(parseFloat(stake) * 2 * 0.95).toLocaleString()}</strong></div>
+              <div className="row-between"><span className="muted">Total pool</span><strong>{formatMoney(feePreview.data.total_pool, feePreview.data.currency)}</strong></div>
+              <div className="row-between"><span className="muted">Platform fee ({feePreview.data.platform_fee_percent}%)</span><strong>{formatMoney(feePreview.data.platform_fee_amount, feePreview.data.currency)}</strong></div>
+              <div className="row-between"><span className="muted">Estimated winner settlement</span><strong style={{ color: 'var(--success)' }}>{formatMoney(feePreview.data.estimated_winner_settlement, feePreview.data.currency)}</strong></div>
             </div>
           )}
+          {stakeAmount > 0 && feePreview.isLoading && <p className="help-text" role="status">Calculating fee and pool…</p>}
+          {stakeAmount > 0 && feePreview.isError && <p className="error-text" role="alert">Fee details are unavailable. Try again before continuing.</p>}
         </div>
       )}
 
@@ -233,13 +250,14 @@ export default function CreateDebate() {
       {step === 6 && (
         <div className="card">
           <h3>Review</h3>
+          {moneyMode && <Explain>Money mode is selected, but paid debates are currently locked until verified-age records and live payment checks are implemented. You can review the rules here; creating this paid debate is disabled.</Explain>}
           <Explain>Before you commit, make sure these four answers are clear.</Explain>
           <table className="table">
             <tbody>
               <tr><td className="muted">What's being debated?</td><td><strong>{question}</strong></td></tr>
               <tr><td className="muted">Who decides?</td><td>{mode === 'local' ? `${requiredVoters} invited voters` : `Settlement source: ${settlementSource}`}</td></tr>
               <tr><td className="muted">When does it end?</td><td>{endAt ? new Date(endAt).toLocaleString() : '—'}</td></tr>
-              <tr><td className="muted">What happens to money?</td><td>{parseFloat(stake) > 0 ? `Each side locks UGX ${parseFloat(stake).toLocaleString()}; winner gets the pool minus 5% fee.` : 'No financial stake — free debate.'}</td></tr>
+              <tr><td className="muted">What happens to money?</td><td>{parseFloat(stake) > 0 ? `Each side locks UGX ${parseFloat(stake).toLocaleString()}; platform fee is calculated by the server.` : 'No financial stake — free debate.'}</td></tr>
               <tr><td className="muted">Type</td><td>{mode === 'local' ? 'Local Debate' : 'Online Result Debate'}</td></tr>
               <tr><td className="muted">Sides</td><td>{sideA} VS {sideB}</td></tr>
             </tbody>
@@ -252,8 +270,8 @@ export default function CreateDebate() {
         {step < STEP_COUNT - 1 ? (
           <button className="btn btn-primary" onClick={() => validateStep() && next()}>Continue →</button>
         ) : (
-          <button className="btn btn-primary" onClick={submit} disabled={createMutation.isPending}>
-            {createMutation.isPending ? 'Creating…' : 'Create Debate'}
+            <button className="btn btn-primary" onClick={submit} disabled={createMutation.isPending || moneyMode}>
+            {createMutation.isPending ? 'Creating…' : moneyMode ? 'Money mode unavailable' : 'Create Debate'}
           </button>
         )}
       </div>

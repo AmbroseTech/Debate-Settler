@@ -110,15 +110,34 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="auth-wrap">
-      <div style={{ fontWeight: 800, fontSize: '2rem', letterSpacing: '0.1em', marginBottom: 8 }}>DS</div>
-      <div className="card auth-card">
+    <div className="auth-wrap auth-stage">
+      <section className="auth-story" aria-label="About Debate Settler">
+        <div className="auth-brand"><span className="auth-brand-mark">DS</span><span>DEBATE SETTLER</span></div>
+        <div className="auth-story-copy">
+          <div className="eyebrow"><span className="live-dot" /> A better way to settle it</div>
+          <h1>Bring your point.<br /><em>Back it up.</em></h1>
+          <p>Turn a disagreement into a clear question, fair rules, and a result everyone can understand.</p>
+          <div className="auth-principles">
+            <div><span>01</span><strong>Set the question</strong><small>Make the claim specific before it begins.</small></div>
+            <div><span>02</span><strong>Agree the rules</strong><small>Both sides know how the debate is decided.</small></div>
+            <div><span>03</span><strong>Settle it fairly</strong><small>People or a named source decide the result.</small></div>
+          </div>
+        </div>
+        <div className="auth-story-foot"><span>MAKE YOUR CASE. SETTLE IT.</span><span>BUILT FOR BETTER DISAGREEMENTS ↗</span></div>
+        <div className="auth-orbit" aria-hidden="true"><span>A</span><b>VS</b><span>B</span></div>
+      </section>
+      <div className="auth-form-side">
+       <div className="card auth-card">
+        <div className="auth-mobile-brand"><span className="auth-brand-mark">DS</span><span>DEBATE SETTLER</span></div>
+        <div className="auth-heading">
         <h2 style={{ textAlign: 'center' }}>
           {mode === 'signin' && 'Sign in'}
           {mode === 'register' && 'Create your account'}
           {mode === 'forgot' && 'Reset your password'}
           {mode === 'reset' && 'Choose a new password'}
         </h2>
+        <p>{mode === 'signin' ? 'Welcome back. Your next debate starts here.' : mode === 'register' ? 'Join the conversation. Settle it with clarity.' : 'We’ll help you get back into your account.'}</p>
+        </div>
 
         {error && <div className="error-text" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
         {info && <div className="help-text" style={{ marginBottom: 12, color: 'var(--success)' }}>{info}</div>}
@@ -193,7 +212,8 @@ export default function AuthPage() {
         )}
       </div>
 
-      <div className="auth-footer">Powered by VerseTechnologies</div>
+      <div className="auth-footer">By continuing, you agree to use Debate Settler respectfully. <span>·</span> Powered by VerseTechnologies</div>
+      </div>
 
       <Modal open={termsOpen} onClose={() => setTermsOpen(false)} title="Terms and Conditions">
         <ol style={{ paddingLeft: 20, lineHeight: 1.7, fontSize: '0.9rem' }}>

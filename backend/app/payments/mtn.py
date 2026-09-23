@@ -29,12 +29,14 @@ class MTNProvider(PaymentProviderAdapter):
     display_name = "MTN Mobile Money"
     kind = "mobile_money"
     supports_deposit = True
-    supports_payout = True
+    # Keep payouts unavailable until the account's disbursement credentials and
+    # transaction verification flow have been confirmed for this deployment.
+    supports_payout = False
 
     def countries(self) -> Optional[list[str]]:
         return ["UG"]
 
-    def _is_configured(self) -> bool:
+    def is_configured(self) -> bool:
         return bool(settings.MTN_API_KEY and settings.MTN_API_SECRET)
 
     async def _headers(self) -> Dict[str, str]:
@@ -47,7 +49,7 @@ class MTNProvider(PaymentProviderAdapter):
         }
 
     async def create_deposit(self, ctx: ProviderContext) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(
                 status=PaymentResultStatus.failed,
                 message="MTN provider is not configured.",
@@ -81,7 +83,7 @@ class MTNProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach MTN.")
 
     async def verify_payment(self, provider_reference: str) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="MTN not configured.")
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -105,7 +107,7 @@ class MTNProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.pending, message="Verification pending.")
 
     async def create_payout(self, ctx: ProviderContext) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="MTN not configured.")
         body = {
             "amount": str(ctx.amount),
@@ -133,7 +135,7 @@ class MTNProvider(PaymentProviderAdapter):
             return PaymentResult(status=PaymentResultStatus.failed, message="Could not reach MTN.")
 
     async def check_payout_status(self, provider_reference: str) -> PaymentResult:
-        if not self._is_configured():
+        if not self.is_configured():
             return PaymentResult(status=PaymentResultStatus.failed, message="MTN not configured.")
         try:
             async with httpx.AsyncClient(timeout=30) as client:

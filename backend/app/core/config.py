@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     AIRTEL_API_KEY: str = ""
     AIRTEL_API_SECRET: str = ""
     AIRTEL_BASE_URL: str = "https://openapiuat.airtel.africa"
+    AIRTEL_ENABLED: bool = False
 
     # --- Notifications ---
     EMAIL_API_KEY: str = ""

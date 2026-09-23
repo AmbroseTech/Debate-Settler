@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.exceptions import (
     ConflictError,
     DebateLockedError,
+    FeatureDisabledError,
     NotFoundError,
     ValidationError,
 )
@@ -40,6 +41,7 @@ from app.models.debate import (
     DebateVote,
 )
 from app.models.user import User
+from app.payments.registry import real_money_enabled
 from app.schemas.debate import DebateCreate
 from app.services import ledger_service, notification_service, wallet_service
 from app.services.audit_service import record_audit
@@ -62,8 +64,17 @@ async def create_debate(db: AsyncSession, user: User, data: DebateCreate) -> Deb
         raise ValidationError(
             "An Online Result Debate needs an agreed settlement source before it can be created."
         )
-    if data.stake_amount > 0 and not (settings.ENABLE_REAL_MONEY or settings.PAYMENT_MODE == "demo"):
-        raise ConflictError("Stakes are not enabled in this configuration.")
+    if data.stake_amount > 0:
+        demo_stakes = settings.APP_ENV != "production" and settings.PAYMENT_MODE == "demo"
+        live_stakes = real_money_enabled() and settings.ENABLE_LOCAL_MONEY
+        if not (demo_stakes or live_stakes):
+            raise FeatureDisabledError(
+                "Money debates are unavailable until live payments and local money are configured."
+            )
+        if live_stakes:
+            raise FeatureDisabledError(
+                "Money debates are unavailable until this project has verified-age records and eligibility checks."
+            )
 
     debate = Debate(
         creator_id=user.id,
