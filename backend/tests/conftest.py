@@ -3,15 +3,23 @@ from __future__ import annotations
 
 import asyncio
 import os
+<<<<<<< HEAD
 import uuid
 from typing import AsyncGenerator
+=======
+from collections.abc import AsyncGenerator
+from decimal import Decimal
+>>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Use SQLite for tests so no external DB is required.
+# These must be set BEFORE any `app` module is imported (settings load at import time).
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+<<<<<<< HEAD
 
 from app.core.database import Base, engine, get_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -19,6 +27,18 @@ from app.core.security import hash_password  # noqa: E402
 from app.models.base import UserRole  # noqa: E402
 from app.models.user import Profile, User, UserPreferences  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: E402
+=======
+os.environ["SYNC_DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["PAYMENT_MODE"] = "demo"
+os.environ["ENABLE_REAL_MONEY"] = "false"
+
+from app.core.database import Base, engine, get_db
+from app.core.security import hash_password
+from app.main import app
+from app.models.base import UserRole
+from app.models.user import Profile, User, UserPreferences
+from app.services import ledger_service
+>>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
 
 
 @pytest.fixture(scope="session")
@@ -56,9 +76,12 @@ async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 @pytest_asyncio.fixture
 async def seeded_user(db: AsyncSession) -> User:
     user = User(
-        username="tester", email="tester@example.com",
-        hashed_password=hash_password("Password123!"), role=UserRole.user,
-        email_verified=True, country_code="UG",
+        username="tester",
+        email="tester@example.com",
+        hashed_password=hash_password("Password123!"),
+        role=UserRole.user,
+        email_verified=True,
+        country_code="UG",
     )
     db.add(user)
     await db.flush()
@@ -68,8 +91,15 @@ async def seeded_user(db: AsyncSession) -> User:
     return user
 
 
-async def auth_header(client: AsyncClient, identifier: str = "tester", password: str = "Password123!") -> dict:
-    resp = await client.post("/api/v1/auth/login", json={"identifier": identifier, "password": password})
+async def auth_header(
+    client: AsyncClient,
+    identifier: str = "tester",
+    password: str = "Password123!",
+) -> dict:
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"identifier": identifier, "password": password},
+    )
     assert resp.status_code == 200, resp.text
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
