@@ -3,8 +3,8 @@
 export type DebateMode = 'local' | 'online'
 export type DebateStatus =
   | 'draft' | 'open' | 'active' | 'voting' | 'closing_soon' | 'closed'
-  | 'being_verified' | 'settled' | 'draw' | 'disputed' | 'funding_timeout'
-  | 'cancelled' | 'under_review' | 'payment_pending'
+  | 'being_verified' | 'settled' | 'draw' | 'disputed'
+  | 'cancelled' | 'under_review'
 export type Side = 'a' | 'b'
 export type VoteChoice = 'side_a' | 'side_b' | 'draw'
 export type UserRole = 'user' | 'moderator' | 'admin'
@@ -45,7 +45,6 @@ export interface DebateRules {
   votes_public: boolean
   allow_draw: boolean
   allow_vote_change: boolean
-  draw_returns_stakes: boolean
   venue?: string | null
   city?: string | null
   country?: string | null
@@ -62,7 +61,6 @@ export interface Participant {
   user_id?: string | null
   role: 'creator' | 'challenger' | 'voter'
   side?: Side | null
-  has_funded: boolean
   confirmed: boolean
   username?: string | null
 }
@@ -83,8 +81,7 @@ export interface DebateBrief {
   question: string
   side_a_label: string
   side_b_label: string
-  stake_amount: string
-  currency: string
+  timezone: string
   start_at?: string | null
   end_at?: string | null
   views: number
@@ -98,7 +95,6 @@ export interface DebateBrief {
 }
 
 export interface DebateDetail extends DebateBrief {
-  platform_fee_percent: string
   is_public: boolean
   locked_at?: string | null
   settled_at?: string | null
@@ -111,38 +107,6 @@ export interface DebateDetail extends DebateBrief {
   my_side?: Side | null
   my_role?: 'creator' | 'challenger' | 'voter' | null
   has_voted?: VoteChoice | null
-}
-
-export interface Wallet {
-  id: string
-  currency: string
-  is_frozen: boolean
-  available_balance: string
-  locked_balance: string
-  pending_balance: string
-  withdrawable_balance: string
-}
-
-export interface Transaction {
-  id: string
-  reference: string
-  type: string
-  amount: string
-  currency: string
-  status: string
-  provider?: string | null
-  debate_id?: string | null
-  is_demo: boolean
-  created_at: string
-}
-
-export interface ProviderOption {
-  code: string
-  display_name: string
-  kind: string
-  supports_deposit: boolean
-  supports_payout: boolean
-  is_demo: boolean
 }
 
 export interface Category {
@@ -161,17 +125,6 @@ export interface Notification {
   link?: string | null
   read: boolean
   created_at: string
-}
-
-export interface StakePreview {
-  your_stake: string
-  total_pool: string
-  platform_fee_percent: string
-  platform_fee_amount: string
-  estimated_winner_settlement: string
-  currency: string
-  is_demo: boolean
-  real_money_enabled: boolean
 }
 
 export interface Paginated<T> {

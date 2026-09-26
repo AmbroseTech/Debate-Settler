@@ -45,8 +45,8 @@ export function friendlyError(err: unknown, fallback = 'Something went wrong. Pl
 // Typed API surface -------------------------------------------------------
 
 import type {
-  Category, DebateBrief, DebateDetail, Notification, Paginated, ProviderOption,
-  StakePreview, TokenResponse, Transaction, User, VoteChoice, Wallet,
+  Category, DebateBrief, DebateDetail, Notification, Paginated,
+  TokenResponse, User, VoteChoice,
 } from '../types'
 
 export const authApi = {
@@ -74,29 +74,12 @@ export const debatesApi = {
   vote: (id: string, choice: VoteChoice) =>
     api.post(`/debates/${id}/vote`, { choice }).then(r => r.data),
   confirm: (id: string, side: 'a' | 'b') => api.post(`/debates/${id}/confirm`, { side }).then(r => r.data),
-  fund: (id: string) => api.post(`/debates/${id}/fund`).then(r => r.data),
   lock: (id: string) => api.post(`/debates/${id}/lock`).then(r => r.data),
-  stakePreview: (id: string) => api.get<StakePreview>(`/debates/${id}/stake-preview`).then(r => r.data),
   createInvitation: (id: string, body: Record<string, unknown>) =>
     api.post(`/debates/${id}/invitations`, body).then(r => r.data),
   share: (id: string) => api.get(`/debates/${id}/share`).then(r => r.data),
   acceptInvitation: (token: string) =>
     api.post('/debates/invitations/accept', null, { params: { token } }).then(r => r.data),
-}
-
-export const walletApi = {
-  get: () => api.get<Wallet>('/wallet').then(r => r.data),
-  transactions: (params: Record<string, unknown> = {}) =>
-    api.get<Paginated<Transaction>>('/wallet/transactions', { params }).then(r => r.data),
-  stakePreview: (amount: number) =>
-    api.get<StakePreview>('/wallet/stake-preview', { params: { amount } }).then(r => r.data),
-  providers: (for_payout = false) =>
-    api.get<ProviderOption[]>('/payments/providers', { params: { for_payout } }).then(r => r.data),
-  deposit: (body: Record<string, unknown>) => api.post('/deposits', body).then(r => r.data),
-  withdrawalQuote: (amount: number) =>
-    api.get('/withdrawals/quote', { params: { amount } }).then(r => r.data),
-  withdraw: (body: Record<string, unknown>) => api.post('/withdrawals', body).then(r => r.data),
-  listWithdrawals: () => api.get('/withdrawals').then(r => r.data),
 }
 
 export const categoriesApi = {

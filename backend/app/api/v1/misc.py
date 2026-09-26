@@ -140,7 +140,7 @@ async def resolve_dispute(
 
 @games_router.post("", response_model=GameOut, status_code=201)
 async def create_game(payload: GameCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    game = Game(game_type=payload.game_type, status=GameStatus.waiting, player_one_id=user.id, is_real_money=False)
+    game = Game(game_type=payload.game_type, status=GameStatus.waiting, player_one_id=user.id)
     db.add(game)
     await db.commit()
     await db.refresh(game)

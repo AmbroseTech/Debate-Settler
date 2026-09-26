@@ -1,4 +1,4 @@
-// Formatting helpers: money, dates, status labels (§49, §57).
+// Formatting helpers for dates and debate status labels.
 import type { DebateStatus } from '../types'
 
 export function formatMoney(amount: string | number, currency = 'UGX'): string {
@@ -44,22 +44,12 @@ export const STATUS_LABELS: Record<DebateStatus, { label: string; emoji: string;
   settled: { label: 'Settled', emoji: '🏆', cls: 'badge-settled' },
   draw: { label: 'Draw', emoji: '↔️', cls: 'badge-draw' },
   disputed: { label: 'Disputed', emoji: '🔴', cls: 'badge-disputed' },
-  funding_timeout: { label: 'Funding Timeout', emoji: '⏱️', cls: 'badge-waiting' },
   cancelled: { label: 'Cancelled', emoji: '🚫', cls: 'badge-closed' },
   under_review: { label: 'Under Review', emoji: '🔍', cls: 'badge-review' },
-  payment_pending: { label: 'Payment Pending', emoji: '🟡', cls: 'badge-waiting' },
 }
 
 export function statusInfo(status: DebateStatus) {
   return STATUS_LABELS[status] ?? { label: status, emoji: '•', cls: 'badge-closed' }
-}
-
-// Plain-English wallet explanations (§29).
-export const WALLET_EXPLAIN: Record<string, string> = {
-  available: 'Money you can currently use or withdraw.',
-  locked: 'Money temporarily committed to an active debate.',
-  pending: 'Money waiting for a transaction or settlement to finish.',
-  withdrawable: 'Money currently eligible for withdrawal.',
 }
 
 export function truncate(text: string, max = 80): string {

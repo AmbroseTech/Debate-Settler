@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    logger.info("app_startup", env=settings.APP_ENV, payment_mode=settings.PAYMENT_MODE)
+    logger.info("app_startup", env=settings.APP_ENV)
     yield
     await close_redis()
     logger.info("app_shutdown")
@@ -33,9 +33,7 @@ app = FastAPI(
     title="Debate_Settler API",
     version="1.0.0",
     description=(
-        "Social debate and competitive challenge platform. Create debates, "
-        "challenge others, invite audiences, vote, settle verifiable results and "
-        "manage a transparent wallet."
+        "A global community for structured debate, evidence, participation, and voting."
     ),
     lifespan=lifespan,
     docs_url="/docs",

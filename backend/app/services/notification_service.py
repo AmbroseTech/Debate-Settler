@@ -63,9 +63,3 @@ async def notify_settled(db: AsyncSession, user_id: uuid.UUID, message: str) -> 
         message, category="settlement",
     )
 
-
-async def notify_withdrawal_status(db: AsyncSession, user_id: uuid.UUID, status: str, reference: str) -> None:
-    await notify(
-        db, user_id, f"Withdrawal {status}",
-        f"Your withdrawal {reference} is now {status.lower()}.", category="wallet",
-    )

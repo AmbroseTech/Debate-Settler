@@ -71,10 +71,8 @@ class DebateStatus(str, enum.Enum):
     settled = "settled"
     draw = "draw"
     disputed = "disputed"
-    funding_timeout = "funding_timeout"
     cancelled = "cancelled"
     under_review = "under_review"
-    payment_pending = "payment_pending"
 
 
 class Side(str, enum.Enum):
@@ -92,60 +90,6 @@ class VoteChoice(str, enum.Enum):
     side_a = "side_a"
     side_b = "side_b"
     draw = "draw"
-
-
-class FinancialState(str, enum.Enum):
-    pending = "pending"
-    authorized = "authorized"
-    locked = "locked"
-    processing = "processing"
-    completed = "completed"
-    failed = "failed"
-    refunded = "refunded"
-    reversed = "reversed"
-    on_hold = "on_hold"
-    under_review = "under_review"
-    cancelled = "cancelled"
-
-
-class TransactionType(str, enum.Enum):
-    deposit = "deposit"
-    withdrawal = "withdrawal"
-    stake_lock = "stake_lock"
-    stake_release = "stake_release"
-    payout = "payout"
-    refund = "refund"
-    platform_fee = "platform_fee"
-    provider_fee = "provider_fee"
-    tax = "tax"
-    reversal = "reversal"
-    adjustment = "adjustment"
-
-
-class WithdrawalStatus(str, enum.Enum):
-    requested = "requested"
-    processing = "processing"
-    completed = "completed"
-    failed = "failed"
-    cancelled = "cancelled"
-    under_review = "under_review"
-
-
-class DepositStatus(str, enum.Enum):
-    initiated = "initiated"
-    pending = "pending"
-    completed = "completed"
-    failed = "failed"
-    refunded = "refunded"
-
-
-class LedgerAccount(str, enum.Enum):
-    user_available = "user_available"
-    user_locked = "user_locked"
-    user_pending = "user_pending"
-    platform_fee_revenue = "platform_fee_revenue"
-    provider_fees = "provider_fees"
-    escrow = "escrow"
 
 
 class DisputeStatus(str, enum.Enum):

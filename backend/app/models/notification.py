@@ -56,7 +56,6 @@ class Dispute(BaseModel):
     status: Mapped[DisputeStatus] = mapped_column(
         Enum(DisputeStatus), default=DisputeStatus.open, index=True, nullable=False
     )
-    payout_on_hold: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
@@ -93,7 +92,6 @@ class Game(BaseModel):
     player_two_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
-    is_real_money: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # free play only by default
     state: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON game state
     current_turn: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True

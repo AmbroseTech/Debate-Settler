@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import qrcode
@@ -18,13 +19,15 @@ from app.core.dependencies import get_current_user, get_optional_user
 from app.core.exceptions import NotFoundError
 from app.models.base import DebateMode, DebateStatus, Side, VoteChoice
 from app.models.category import Category
-from app.models.debate import Debate, DebateParticipant, DebateRules, DebateVote, ParticipantRole
+from app.models.debate import Debate, DebateComment, DebateCommentReaction, DebateParticipant, DebateRules, DebateVote, ParticipantRole
 from app.models.user import User
 from app.schemas.common import Message, Paginated
 from app.schemas.debate import (
     AcceptInvitationResponse,
     CastVoteRequest,
     CastVoteResponse,
+    CommentCreate,
+    CommentReactionIn,
     ConfirmSideRequest,
     CreateInvitationRequest,
     DebateBrief,
@@ -35,7 +38,7 @@ from app.schemas.debate import (
     ShareLinks,
     VoteCounts,
 )
-from app.services import debate_service, wallet_service
+from app.services import debate_service
 
 router = APIRouter(prefix="/debates", tags=["debates"])
 
@@ -67,8 +70,7 @@ async def _to_brief(db: AsyncSession, debate: Debate) -> DebateBrief:
         question=debate.question,
         side_a_label=debate.side_a_label,
         side_b_label=debate.side_b_label,
-        stake_amount=debate.stake_amount,
-        currency=debate.currency,
+        timezone=debate.timezone,
         start_at=debate.start_at,
         end_at=debate.end_at,
         views=debate.views,
@@ -100,7 +102,7 @@ async def _to_detail(db: AsyncSession, debate: Debate, user: Optional[User]) -> 
         participant_out.append(
             {
                 "id": p.id, "user_id": p.user_id, "role": p.role, "side": p.side,
-                "has_funded": p.has_funded, "confirmed": p.confirmed, "username": username,
+                "confirmed": p.confirmed, "username": username,
             }
         )
 
@@ -128,7 +130,6 @@ async def _to_detail(db: AsyncSession, debate: Debate, user: Optional[User]) -> 
 
     return DebateDetail(
         **data,
-        platform_fee_percent=debate.platform_fee_percent,
         is_public=debate.is_public,
         locked_at=debate.locked_at,
         settled_at=debate.settled_at,
@@ -234,6 +235,66 @@ async def cast_vote(
     return CastVoteResponse(recorded=recorded, message=message, counts=VoteCounts(**counts))
 
 
+@router.get("/{debate_id}/comments")
+async def list_comments(debate_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    debate = await debate_service.get_debate(db, debate_id)
+    rows = (await db.execute(select(DebateComment).where(
+        DebateComment.debate_id == debate_id, DebateComment.hidden.is_(False)
+    ).order_by(DebateComment.pinned.desc(), DebateComment.created_at.asc()).limit(300))).scalars().all()
+    output = []
+    for row in rows:
+        author = await db.get(User, row.user_id)
+        counts = (await db.execute(select(DebateCommentReaction.reaction, func.count(DebateCommentReaction.id))
+            .where(DebateCommentReaction.comment_id == row.id).group_by(DebateCommentReaction.reaction))).all()
+        output.append({"id": row.id, "parent_id": row.parent_id, "body": row.body,
+            "user_id": row.user_id, "username": author.username if author else "community member",
+            "created_at": row.created_at, "pinned": row.pinned,
+            "reactions": {key: count for key, count in counts}})
+    return {"items": output, "total": len(output)}
+
+
+@router.post("/{debate_id}/comments", status_code=201)
+async def create_comment(debate_id: uuid.UUID, payload: CommentCreate,
+                         user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    debate = await debate_service.get_debate(db, debate_id)
+    if not debate.is_public and user.id != debate.creator_id and not any(p.user_id == user.id for p in debate.participants):
+        raise NotFoundError("Debate not found.")
+    recent = (await db.execute(select(DebateComment).where(
+        DebateComment.user_id == user.id, DebateComment.debate_id == debate_id
+    ).order_by(DebateComment.created_at.desc()).limit(1))).scalar_one_or_none()
+    if recent and (datetime.now(timezone.utc) - recent.created_at.replace(tzinfo=timezone.utc)).total_seconds() < 5:
+        from app.core.exceptions import RateLimitedError
+        raise RateLimitedError()
+    if payload.parent_id:
+        parent = await db.get(DebateComment, payload.parent_id)
+        if not parent or parent.debate_id != debate_id:
+            raise NotFoundError("Reply target not found.")
+    row = DebateComment(debate_id=debate_id, user_id=user.id, parent_id=payload.parent_id, body=payload.body.strip())
+    db.add(row)
+    debate.comments_count += 1
+    await db.commit()
+    await db.refresh(row)
+    return {"id": row.id, "parent_id": row.parent_id, "body": row.body, "user_id": user.id,
+            "username": user.username, "created_at": row.created_at, "pinned": False, "reactions": {}}
+
+
+@router.put("/{debate_id}/comments/{comment_id}/reaction")
+async def react_to_comment(debate_id: uuid.UUID, comment_id: uuid.UUID, payload: CommentReactionIn,
+                           user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    row = await db.get(DebateComment, comment_id)
+    if row is None or row.debate_id != debate_id:
+        raise NotFoundError("Comment not found.")
+    existing = (await db.execute(select(DebateCommentReaction).where(
+        DebateCommentReaction.comment_id == comment_id, DebateCommentReaction.user_id == user.id
+    ))).scalar_one_or_none()
+    if existing:
+        existing.reaction = payload.reaction
+    else:
+        db.add(DebateCommentReaction(comment_id=comment_id, user_id=user.id, reaction=payload.reaction))
+    await db.commit()
+    return {"message": "Reaction saved."}
+
+
 @router.post("/{debate_id}/confirm", response_model=Message)
 async def confirm_side(
     debate_id: uuid.UUID,
@@ -245,18 +306,6 @@ async def confirm_side(
     await debate_service.confirm_side(db, debate, user, payload.side)
     await db.commit()
     return Message(message="Your side has been confirmed.")
-
-
-@router.post("/{debate_id}/fund", response_model=Message)
-async def fund_stake(
-    debate_id: uuid.UUID,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    debate = await debate_service.get_debate(db, debate_id)
-    await debate_service.fund_stake(db, debate, user)
-    await db.commit()
-    return Message(message="Your stake has been locked for this debate.")
 
 
 @router.post("/{debate_id}/lock", response_model=LockDebateResponse)
@@ -271,15 +320,6 @@ async def lock_debate(
     return LockDebateResponse(locked=True, status=debate.status, message="This debate is now locked.")
 
 
-@router.get("/{debate_id}/stake-preview")
-async def stake_preview(
-    debate_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    debate = await debate_service.get_debate(db, debate_id)
-    return wallet_service.stake_preview(debate.stake_amount, debate.currency)
-
-
 # --- Invitations ---
 
 @router.post("/{debate_id}/invitations", response_model=InvitationOut)
@@ -290,6 +330,11 @@ async def create_invitation(
     db: AsyncSession = Depends(get_db),
 ):
     debate = await debate_service.get_debate(db, debate_id)
+    if user.id != debate.creator_id and not any(p.user_id == user.id and p.role == ParticipantRole.challenger for p in debate.participants):
+        raise NotFoundError("Debate not found.")
+    if payload.kind == "voter" and debate.mode != DebateMode.local:
+        from app.core.exceptions import ConflictError
+        raise ConflictError("Community invitations are available for community-voted debates.")
     invitation = await debate_service.create_invitation(
         db, debate, payload.kind, payload.max_uses, payload.expires_in_hours, payload.invited_email
     )
@@ -309,7 +354,7 @@ async def share_links(
     db: AsyncSession = Depends(get_db),
 ):
     debate = await debate_service.get_debate(db, debate_id)
-    invitation = await debate_service.create_invitation(db, debate, "voter", 10000, 72)
+    invitation = await debate_service.create_invitation(db, debate, "voter", 2_147_483_647, 72)
     debate.shares += 1
     await db.commit()
     links = debate_service.build_share_links(settings.FRONTEND_URL, invitation.token)
@@ -327,3 +372,27 @@ async def accept_invitation(
     return AcceptInvitationResponse(
         message="You've joined the debate.", debate_id=invitation.debate_id
     )
+
+
+@router.get("/invitations/{token}")
+async def invitation_details(token: str, db: AsyncSession = Depends(get_db)):
+    from app.models.debate import DebateInvitation
+    invitation = (await db.execute(select(DebateInvitation).where(DebateInvitation.token == token))).scalar_one_or_none()
+    if not invitation or invitation.used or (invitation.expires_at and invitation.expires_at <= datetime.now(timezone.utc)):
+        raise NotFoundError("This invitation is not available.")
+    debate = await debate_service.get_debate(db, invitation.debate_id)
+    return {"kind": invitation.kind, "debate_id": debate.id, "question": debate.question,
+            "creator_id": debate.creator_id, "status": debate.status.value}
+
+
+@router.post("/invitations/decline")
+async def decline_invitation(token: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from app.models.debate import DebateInvitation
+    from app.core.exceptions import ConflictError
+    invitation = (await db.execute(select(DebateInvitation).where(DebateInvitation.token == token))).scalar_one_or_none()
+    if not invitation or invitation.kind != "opponent" or invitation.used:
+        raise NotFoundError("Opponent invitation not found.")
+    invitation.response = "declined"
+    invitation.used = True
+    await db.commit()
+    return {"message": "Challenge declined."}

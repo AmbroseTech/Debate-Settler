@@ -4,20 +4,15 @@ from app.models.base import (
     BaseModel,
     DebateMode,
     DebateStatus,
-    DepositStatus,
     DisputeStatus,
-    FinancialState,
     GameStatus,
     GameType,
-    LedgerAccount,
     NotificationChannel,
     ParticipantRole,
     Side,
-    TransactionType,
     UserRole,
     UserStatus,
     VoteChoice,
-    WithdrawalStatus,
 )
 from app.models.category import DEFAULT_CATEGORIES, Category
 from app.models.debate import (
@@ -29,14 +24,8 @@ from app.models.debate import (
     DebateVote,
 )
 from app.models.notification import AuditLog, Dispute, Game, Notification
-from app.models.payment import (
-    Deposit,
-    PaymentProvider,
-    SettlementRecord,
-    Withdrawal,
-)
 from app.models.user import Follow, Profile, User, UserPreferences, UserSession
-from app.models.wallet import LedgerEntry, PaymentTransaction, Wallet, WalletAccount
+from app.models.debate import DebateComment, DebateCommentReaction
 
 __all__ = [
     "Base",
@@ -54,14 +43,8 @@ __all__ = [
     "DebateVote",
     "DebateInvitation",
     "DebateEvent",
-    "Wallet",
-    "WalletAccount",
-    "PaymentTransaction",
-    "LedgerEntry",
-    "Deposit",
-    "Withdrawal",
-    "PaymentProvider",
-    "SettlementRecord",
+    "DebateComment",
+    "DebateCommentReaction",
     "Notification",
     "Dispute",
     "AuditLog",
@@ -74,11 +57,6 @@ __all__ = [
     "Side",
     "ParticipantRole",
     "VoteChoice",
-    "FinancialState",
-    "TransactionType",
-    "WithdrawalStatus",
-    "DepositStatus",
-    "LedgerAccount",
     "DisputeStatus",
     "NotificationChannel",
     "GameType",

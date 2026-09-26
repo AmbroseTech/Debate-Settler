@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,7 +18,6 @@ class DebateRulesIn(BaseModel):
     votes_public: bool = True
     allow_draw: bool = True
     allow_vote_change: bool = False
-    draw_returns_stakes: bool = True
     venue: Optional[str] = Field(None, max_length=300)
     city: Optional[str] = Field(None, max_length=120)
     country: Optional[str] = Field(None, max_length=120)
@@ -48,8 +46,7 @@ class DebateCreate(BaseModel):
     is_public: bool = True
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
-    stake_amount: Decimal = Field(Decimal("0.00"), ge=0)
-    currency: str = Field("UGX", max_length=3)
+    timezone: str = Field("UTC", max_length=80)
     rules: DebateRulesIn
 
 
@@ -60,7 +57,6 @@ class DebateParticipantOut(BaseModel):
     user_id: Optional[uuid.UUID] = None
     role: ParticipantRole
     side: Optional[Side] = None
-    has_funded: bool = False
     confirmed: bool = False
     username: Optional[str] = None
 
@@ -76,8 +72,7 @@ class DebateBrief(BaseModel):
     question: str
     side_a_label: str
     side_b_label: str
-    stake_amount: Decimal
-    currency: str
+    timezone: str = "UTC"
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
     views: int = 0
@@ -91,7 +86,6 @@ class DebateBrief(BaseModel):
 
 
 class DebateDetail(DebateBrief):
-    platform_fee_percent: Decimal
     is_public: bool
     locked_at: Optional[datetime] = None
     settled_at: Optional[datetime] = None
@@ -174,3 +168,12 @@ class LockDebateResponse(BaseModel):
     locked: bool
     status: DebateStatus
     message: str
+
+
+class CommentCreate(BaseModel):
+    body: str = Field(..., min_length=1, max_length=2000)
+    parent_id: Optional[uuid.UUID] = None
+
+
+class CommentReactionIn(BaseModel):
+    reaction: str = Field(..., pattern="^(like|love|funny|interesting|strong|disagree)$")

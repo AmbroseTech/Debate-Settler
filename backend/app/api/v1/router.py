@@ -8,13 +8,12 @@ import qrcode
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse
 
-from app.api.v1 import admin, auth, debates, misc, users, wallet
+from app.api.v1 import admin, auth, debates, misc, users
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(debates.router)
-api_router.include_router(wallet.router)
 api_router.include_router(misc.categories_router)
 api_router.include_router(misc.notifications_router)
 api_router.include_router(misc.disputes_router)

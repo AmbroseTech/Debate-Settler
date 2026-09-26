@@ -63,21 +63,6 @@ class AccountLockedError(AppError):
     user_message = "Your account is temporarily locked for security. Please try again later."
 
 
-class InsufficientFundsError(AppError):
-    status_code = 400
-    code = "insufficient_funds"
-    user_message = "This amount is not currently available. Please check your balance."
-
-
-class PaymentError(AppError):
-    status_code = 402
-    code = "payment_error"
-    user_message = (
-        "We couldn't confirm your payment yet. Please don't submit the payment "
-        "again until we check its status."
-    )
-
-
 class FeatureDisabledError(AppError):
     status_code = 403
     code = "feature_disabled"

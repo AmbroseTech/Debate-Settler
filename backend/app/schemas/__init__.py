@@ -53,16 +53,5 @@ from app.schemas.misc import (
     NotificationOut,
     SettlementSubmit,
 )
-from app.schemas.wallet import (
-    DepositOut,
-    DepositRequest,
-    ProviderOption,
-    StakePreview,
-    TransactionOut,
-    WalletOut,
-    WithdrawalOut,
-    WithdrawalQuote,
-    WithdrawalRequest,
-)
 
 __all__ = [n for n in dir() if not n.startswith("_")]

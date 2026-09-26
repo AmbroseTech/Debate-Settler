@@ -16,7 +16,6 @@ const Categories = lazy(() => import('./pages/Categories'))
 const CreateDebate = lazy(() => import('./pages/CreateDebate'))
 const DebateDetail = lazy(() => import('./pages/DebateDetail'))
 const MyDebates = lazy(() => import('./pages/MyDebates'))
-const Wallet = lazy(() => import('./pages/Wallet'))
 const Notifications = lazy(() => import('./pages/Notifications'))
 const Games = lazy(() => import('./pages/Games'))
 const Settings = lazy(() => import('./pages/Settings'))
@@ -61,7 +60,6 @@ export default function App() {
             <Route path="/create" element={<CreateDebate />} />
             <Route path="/debates/:id" element={<DebateDetail />} />
             <Route path="/my-debates" element={<MyDebates />} />
-            <Route path="/wallet" element={<Wallet />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/games" element={<Games />} />
             <Route path="/settings" element={<Settings />} />

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import List, Optional
 
 from sqlalchemy import (
@@ -16,7 +15,6 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
-    Numeric,
     String,
     Text,
 )
@@ -56,10 +54,7 @@ class Debate(BaseModel):
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Stakes (currency minor-unit-safe NUMERIC). Zero => free/social debate.
-    stake_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0.00"), nullable=False)
-    currency: Mapped[str] = mapped_column(String(3), default="UGX", nullable=False)
-    platform_fee_percent: Mapped[Decimal] = mapped_column(Numeric(6, 2), default=Decimal("5.00"), nullable=False)
+    timezone: Mapped[str] = mapped_column(String(80), default="UTC", nullable=False)
 
     # Result
     winner_side: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # a | b | draw
@@ -85,6 +80,9 @@ class Debate(BaseModel):
     events: Mapped[List["DebateEvent"]] = relationship(
         back_populates="debate", cascade="all, delete-orphan"
     )
+    comments: Mapped[List["DebateComment"]] = relationship(
+        back_populates="debate", cascade="all, delete-orphan"
+    )
 
 
 class DebateRules(BaseModel):
@@ -98,7 +96,6 @@ class DebateRules(BaseModel):
     votes_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     allow_draw: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     allow_vote_change: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    draw_returns_stakes: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     venue: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     city: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     country: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
@@ -124,8 +121,8 @@ class DebateParticipant(BaseModel):
     )
     role: Mapped[ParticipantRole] = mapped_column(Enum(ParticipantRole), nullable=False)
     side: Mapped[Optional[Side]] = mapped_column(Enum(Side), nullable=True)
-    has_funded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    rules_agreed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     debate: Mapped["Debate"] = relationship(back_populates="participants")
@@ -167,6 +164,7 @@ class DebateInvitation(BaseModel):
     use_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    response: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     debate: Mapped["Debate"] = relationship(back_populates="invitations")
 
@@ -186,3 +184,24 @@ class DebateEvent(BaseModel):
     )
 
     debate: Mapped["Debate"] = relationship(back_populates="events")
+
+
+class DebateComment(BaseModel):
+    __tablename__ = "debate_comments"
+
+    debate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("debates.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("debate_comments.id", ondelete="CASCADE"), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    debate: Mapped["Debate"] = relationship(back_populates="comments")
+
+
+class DebateCommentReaction(BaseModel):
+    __tablename__ = "debate_comment_reactions"
+    __table_args__ = ({"sqlite_autoincrement": True},)
+
+    comment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("debate_comments.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    reaction: Mapped[str] = mapped_column(String(20), nullable=False)

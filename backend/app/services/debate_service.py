@@ -14,7 +14,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.config import settings
 from app.core.exceptions import (
     ConflictError,
     DebateLockedError,
@@ -22,7 +21,6 @@ from app.core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from app.core.money import to_decimal
 from app.core.security import generate_token_urlsafe
 from app.models.base import (
     DebateMode,
@@ -41,9 +39,8 @@ from app.models.debate import (
     DebateVote,
 )
 from app.models.user import User
-from app.payments.registry import real_money_enabled
 from app.schemas.debate import DebateCreate
-from app.services import ledger_service, notification_service, wallet_service
+from app.services import notification_service
 from app.services.audit_service import record_audit
 from app.settlements import engine
 
@@ -64,18 +61,6 @@ async def create_debate(db: AsyncSession, user: User, data: DebateCreate) -> Deb
         raise ValidationError(
             "An Online Result Debate needs an agreed settlement source before it can be created."
         )
-    if data.stake_amount > 0:
-        demo_stakes = settings.APP_ENV != "production" and settings.PAYMENT_MODE == "demo"
-        live_stakes = real_money_enabled() and settings.ENABLE_LOCAL_MONEY
-        if not (demo_stakes or live_stakes):
-            raise FeatureDisabledError(
-                "Money debates are unavailable until live payments and local money are configured."
-            )
-        if live_stakes:
-            raise FeatureDisabledError(
-                "Money debates are unavailable until this project has verified-age records and eligibility checks."
-            )
-
     debate = Debate(
         creator_id=user.id,
         category_id=data.category_id,
@@ -87,9 +72,6 @@ async def create_debate(db: AsyncSession, user: User, data: DebateCreate) -> Deb
         is_public=data.is_public,
         start_at=data.start_at,
         end_at=data.end_at,
-        stake_amount=to_decimal(data.stake_amount),
-        currency=data.currency or settings.DEFAULT_CURRENCY,
-        platform_fee_percent=settings.PLATFORM_FEE_PERCENT,
     )
     db.add(debate)
     await db.flush()
@@ -107,7 +89,7 @@ async def create_debate(db: AsyncSession, user: User, data: DebateCreate) -> Deb
     await _add_event(db, debate.id, "created", actor_id=user.id)
     await record_audit(
         db, "debate_creation", actor_id=user.id, entity_type="debate", entity_id=str(debate.id),
-        details={"mode": data.mode.value, "stake": str(debate.stake_amount)},
+        details={"mode": data.mode.value},
     )
 
     # Increment creator's debates_created stat.
@@ -144,8 +126,12 @@ async def create_invitation(
     db: AsyncSession, debate: Debate, kind: str, max_uses: int,
     expires_in_hours: int, invited_email: Optional[str] = None,
 ) -> DebateInvitation:
-    if debate.locked_at is not None:
+    if kind == "voter" and debate.locked_at is None:
+        raise ConflictError("Voter invitations open after both debators agree and lock the rules.")
+    if debate.locked_at is not None and kind == "opponent":
         raise DebateLockedError()
+    if kind == "voter" and max_uses < 1:
+        raise ValidationError("An invitation must allow at least one person.")
     token = generate_token_urlsafe(24)
     invitation = DebateInvitation(
         debate_id=debate.id,
@@ -182,7 +168,7 @@ async def accept_invitation(db: AsyncSession, token: str, user: User) -> DebateI
     invitation = result.scalar_one_or_none()
     if invitation is None:
         raise NotFoundError("This invitation link is not valid.")
-    if invitation.used or (invitation.expires_at and invitation.expires_at < _now()):
+    if invitation.response == "declined" or invitation.used or (invitation.expires_at and invitation.expires_at < _now()):
         raise ConflictError("This invitation has expired or already been used.")
     if invitation.use_count >= invitation.max_uses:
         raise ConflictError("This invitation has reached its usage limit.")
@@ -229,8 +215,8 @@ async def _join_as_opponent(db: AsyncSession, debate: Debate, user: User) -> Non
             role=ParticipantRole.challenger, side=Side.b, joined_at=_now(),
         )
     )
-    if debate.status == DebateStatus.open or debate.status == DebateStatus.draft:
-        debate.status = DebateStatus.payment_pending if debate.stake_amount > 0 else DebateStatus.active
+    if debate.status in (DebateStatus.open, DebateStatus.draft):
+        debate.status = DebateStatus.open
     from app.models.user import Profile
 
     prof = (await db.execute(select(Profile).where(Profile.user_id == user.id))).scalar_one_or_none()
@@ -278,36 +264,8 @@ async def confirm_side(db: AsyncSession, debate: Debate, user: User, side: Side)
     await db.flush()
 
 
-async def fund_stake(db: AsyncSession, debate: Debate, user: User) -> None:
-    """Lock this participant's stake for a financial debate (§24)."""
-    if debate.locked_at is not None:
-        raise DebateLockedError()
-    if debate.stake_amount <= 0:
-        raise ConflictError("This debate has no financial stake.")
-    result = await db.execute(
-        select(DebateParticipant).where(
-            DebateParticipant.debate_id == debate.id, DebateParticipant.user_id == user.id,
-            DebateParticipant.role.in_([ParticipantRole.creator, ParticipantRole.challenger]),
-        )
-    )
-    participant = result.scalar_one_or_none()
-    if participant is None:
-        raise NotFoundError("You are not a participant in this debate.")
-    if participant.has_funded:
-        return
-    wallet = await wallet_service.get_wallet(db, user.id)
-    await ledger_service.lock_stake(
-        db, wallet, debate.stake_amount, debate_id=debate.id,
-        description=f"Stake for “{debate.question}”",
-        idempotency_key=f"stake:{debate.id}:{user.id}",
-    )
-    participant.has_funded = True
-    await _add_event(db, debate.id, "stake_funded", actor_id=user.id)
-    await db.flush()
-
-
 async def lock_debate(db: AsyncSession, debate: Debate, actor: User) -> Debate:
-    """Lock a debate once both sides have confirmed (and funded, if a stake)."""
+    """Lock the agreed rules once both sides have confirmed them."""
     if debate.locked_at is not None:
         raise DebateLockedError()
 
@@ -324,8 +282,6 @@ async def lock_debate(db: AsyncSession, debate: Debate, actor: User) -> Debate:
         raise ConflictError("Both sides must join before the debate can be locked.")
     if not all(p.confirmed for p in participants):
         raise ConflictError("Both sides must confirm the rules before locking.")
-    if debate.stake_amount > 0 and not all(p.has_funded for p in participants):
-        raise ConflictError("Both sides must fund their stake before locking.")
     if debate.mode == DebateMode.online and (not debate.rules or not debate.rules.settlement_source):
         raise ValidationError("An Online Result Debate needs a settlement source before locking.")
 
@@ -338,6 +294,8 @@ async def lock_debate(db: AsyncSession, debate: Debate, actor: User) -> Debate:
 
 
 async def cast_vote(db: AsyncSession, debate: Debate, user: User, choice: VoteChoice) -> Tuple[bool, str]:
+    if debate.locked_at is None:
+        raise ConflictError("Voting opens after both debators agree to the rules and lock the debate.")
     if debate.mode != DebateMode.local:
         raise ConflictError("Only local debates use audience voting.")
     now = _now()

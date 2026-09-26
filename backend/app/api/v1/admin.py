@@ -6,29 +6,24 @@ verified settlement result for online debates and manage disputes/users.
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
 from typing import List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import require_role
 from app.core.exceptions import NotFoundError
 from app.models.base import (
     DebateMode,
     DisputeStatus,
-    FinancialState,
-    TransactionType,
     UserRole,
     UserStatus,
 )
 from app.models.debate import Debate, DebateVote
 from app.models.notification import AuditLog, Dispute
 from app.models.user import User
-from app.models.wallet import PaymentTransaction
 from app.schemas.common import Message
 from app.schemas.misc import AdminStats, SettlementSubmit
 from app.services.audit_service import record_audit
@@ -52,24 +47,9 @@ async def stats(db: AsyncSession = Depends(get_db)):
         )
     ).scalar_one()
 
-    async def _sum(type_: TransactionType) -> Decimal:
-        value = (
-            await db.execute(
-                select(func.coalesce(func.sum(PaymentTransaction.amount), 0)).where(
-                    PaymentTransaction.type == type_,
-                    PaymentTransaction.status == FinancialState.completed,
-                )
-            )
-        ).scalar_one()
-        return Decimal(str(value))
-
-    deposits = await _sum(TransactionType.deposit)
-    withdrawals = await _sum(TransactionType.withdrawal)
-    fees = await _sum(TransactionType.platform_fee)
     return AdminStats(
         users=users, debates=debates, local_debates=local, online_debates=online,
-        votes=votes, deposits=deposits, withdrawals=withdrawals, platform_fees=fees,
-        open_disputes=open_disputes, currency=settings.DEFAULT_CURRENCY,
+        votes=votes, open_disputes=open_disputes,
     )
 
 
@@ -104,14 +84,9 @@ async def freeze_user(user_id: uuid.UUID, admin: User = Depends(require_role(Use
     if user is None:
         raise NotFoundError("User not found.")
     user.status = UserStatus.frozen
-    from app.models.wallet import Wallet
-
-    wallet = (await db.execute(select(Wallet).where(Wallet.user_id == user_id))).scalar_one_or_none()
-    if wallet:
-        wallet.is_frozen = True
-    await record_audit(db, "wallet_freeze", actor_id=admin.id, entity_type="user", entity_id=str(user_id))
+    await record_audit(db, "user_freeze", actor_id=admin.id, entity_type="user", entity_id=str(user_id))
     await db.commit()
-    return Message(message="User and wallet frozen.")
+    return Message(message="User account frozen.")
 
 
 @router.post("/settlements/submit", response_model=Message)

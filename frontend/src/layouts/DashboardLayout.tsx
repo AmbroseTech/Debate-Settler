@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
-import { notificationsApi, walletApi } from '../api/client'
-import { formatMoney } from '../utils/format'
+import { notificationsApi } from '../api/client'
 
 const NAV = [
   { to: '/', label: 'Home', icon: '🏠', end: true },
@@ -14,7 +13,6 @@ const NAV = [
   { to: '/categories', label: 'Categories', icon: '🗂️' },
   { to: '/my-debates', label: 'My Debates', icon: '📋' },
   { to: '/notifications', label: 'Notifications', icon: '🔔' },
-  { to: '/wallet', label: 'Wallet', icon: '💳' },
   { to: '/games', label: 'Games', icon: '🎮' },
 ]
 const FOOTER_NAV = [
@@ -29,7 +27,6 @@ const MOBILE_NAV = [
   { to: '/', label: 'Home', icon: '🏠' },
   { to: '/discover', label: 'Discover', icon: '🔎' },
   { to: '/create', label: 'Create', icon: '➕' },
-  { to: '/wallet', label: 'Wallet', icon: '💳' },
   { to: '/notifications', label: 'Alerts', icon: '🔔' },
 ]
 
@@ -39,7 +36,6 @@ export default function DashboardLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const { data: wallet } = useQuery({ queryKey: ['wallet'], queryFn: walletApi.get })
   const { data: notifications } = useQuery({ queryKey: ['notifications'], queryFn: notificationsApi.list })
   const unread = (notifications ?? []).filter((n) => !n.read).length
 
@@ -97,11 +93,6 @@ export default function DashboardLayout() {
           </form>
 
           <div className="row" style={{ marginLeft: 'auto' }}>
-            {wallet && (
-              <Link to="/wallet" className="badge" title="Wallet balance">
-                💳 {formatMoney(wallet.available_balance, wallet.currency)}
-              </Link>
-            )}
             <Link to="/notifications" className="btn btn-ghost btn-sm" aria-label={`Notifications, ${unread} unread`}>
               🔔{unread > 0 && <span className="badge" style={{ background: 'var(--danger)', color: '#fff', borderColor: 'transparent', marginLeft: 4 }}>{unread}</span>}
             </Link>

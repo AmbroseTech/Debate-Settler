@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -87,7 +86,6 @@ class GameOut(BaseModel):
     status: GameStatus
     player_one_id: Optional[uuid.UUID] = None
     player_two_id: Optional[uuid.UUID] = None
-    is_real_money: bool = False
     state: Optional[str] = None
     current_turn: Optional[uuid.UUID] = None
     winner_id: Optional[uuid.UUID] = None
@@ -105,11 +103,7 @@ class AdminStats(BaseModel):
     local_debates: int
     online_debates: int
     votes: int
-    deposits: Decimal
-    withdrawals: Decimal
-    platform_fees: Decimal
     open_disputes: int
-    currency: str
 
 
 class SettlementSubmit(BaseModel):

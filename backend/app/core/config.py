@@ -5,7 +5,6 @@ ever hard-coded. See `.env.example` at the repository root for the full list.
 """
 from __future__ import annotations
 
-from decimal import Decimal
 from functools import lru_cache
 from typing import List
 
@@ -54,39 +53,9 @@ class Settings(BaseSettings):
     MAX_LOGIN_ATTEMPTS: int = 5
     ACCOUNT_LOCKOUT_MINUTES: int = 15
 
-    # --- Compliance / feature flags ---
-    # These control whether financially-sensitive features are available.
-    ENABLE_REAL_MONEY: bool = False
-    ENABLE_LOCAL_MONEY: bool = False
-    ENABLE_WITHDRAWALS: bool = False
     ENABLE_GAMES: bool = True
-    REQUIRE_KYC: bool = False
-    REQUIRE_AGE_VERIFICATION: bool = False
-
-    # --- Financial configuration ---
-    DEFAULT_CURRENCY: str = "UGX"
-    # Platform settlement fee is configurable (percentage). Business/legal may
-    # set this anywhere within PLATFORM_FEE_MIN..PLATFORM_FEE_MAX.
-    PLATFORM_FEE_PERCENT: Decimal = Decimal("5.00")
-    PLATFORM_FEE_MIN: Decimal = Decimal("0.00")
-    PLATFORM_FEE_MAX: Decimal = Decimal("10.00")
-    WITHDRAWAL_FEE_PERCENT: Decimal = Decimal("1.00")
-    FUNDING_TIMEOUT_MINUTES: int = 60
-
-    # --- Payment providers (only include what is configured) ---
-    PAYMENT_MODE: str = "demo"  # demo | live
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-    PAYPAL_CLIENT_ID: str = ""
-    PAYPAL_CLIENT_SECRET: str = ""
-    PAYPAL_WEBHOOK_ID: str = ""
-    MTN_API_KEY: str = ""
-    MTN_API_SECRET: str = ""
-    MTN_BASE_URL: str = "https://sandbox.momodeveloper.mtn.com"
-    AIRTEL_API_KEY: str = ""
-    AIRTEL_API_SECRET: str = ""
-    AIRTEL_BASE_URL: str = "https://openapiuat.airtel.africa"
-    AIRTEL_ENABLED: bool = False
+    MAX_MEDIA_UPLOAD_MB: int = 25
+    MAX_VIDEO_SECONDS: int = 120
 
     # --- Notifications ---
     EMAIL_API_KEY: str = ""
@@ -99,10 +68,6 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
-
-    @property
-    def platform_fee_fraction(self) -> Decimal:
-        return self.PLATFORM_FEE_PERCENT / Decimal(100)
 
 
 @lru_cache
