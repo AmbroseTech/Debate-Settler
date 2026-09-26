@@ -90,10 +90,8 @@ async def create_dispute(payload: DisputeCreate, user: User = Depends(get_curren
         reason=payload.reason,
         evidence=payload.evidence,
         status=DisputeStatus.open,
-        payout_on_hold=True,
     )
     db.add(dispute)
-    debate.status = debate.status  # keep; settlement engine will hold payout
     await record_audit(db, "dispute", actor_id=user.id, entity_type="debate", entity_id=str(debate.id))
     await db.commit()
     await db.refresh(dispute)
@@ -125,7 +123,6 @@ async def resolve_dispute(
     dispute.status = payload.status
     dispute.resolution_notes = payload.resolution_notes
     dispute.resolved_by = admin.id
-    dispute.payout_on_hold = payload.status in (DisputeStatus.open, DisputeStatus.under_review)
     from datetime import datetime, timezone
 
     dispute.resolved_at = datetime.now(timezone.utc)

@@ -1,10 +1,12 @@
-"""Debate tests (§72): create, invite, lock, vote, settlement, rules protection."""
+"""Debate tests: create, invite opponent, lock, voter invitations, voting, rules."""
 from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
-from app.core.config import settings
+from app.models.base import ParticipantRole, Side
+from app.models.debate import DebateParticipant
 from tests.conftest import auth_header
 
 
@@ -14,10 +16,31 @@ def _local_debate_payload():
         "question": "Which presentation was better?",
         "side_a_label": "Team Alpha",
         "side_b_label": "Team Beta",
-        "stake_amount": "0",
-        "currency": "UGX",
-        "rules": {"required_voters": 3, "votes_public": False, "allow_draw": True},
+        "rules": {"required_voters": 3, "votes_public": True, "allow_draw": True},
     }
+
+
+async def _lock_debate(client: AsyncClient, db, debate_id: str, headers: dict) -> None:
+    """Add a confirmed opponent on side B and lock the debate (both sides agreed)."""
+    from app.core.security import hash_password
+    from app.models.base import UserRole
+    from app.models.user import Profile, User, UserPreferences
+
+    opponent = User(
+        username="opponent", email="opp@example.com",
+        hashed_password=hash_password("Password123!"), role=UserRole.user,
+    )
+    db.add(opponent)
+    await db.flush()
+    db.add(Profile(user_id=opponent.id))
+    db.add(UserPreferences(user_id=opponent.id))
+    db.add(DebateParticipant(
+        debate_id=__import__("uuid").UUID(debate_id), user_id=opponent.id,
+        role=ParticipantRole.challenger, side=Side.b, confirmed=True,
+    ))
+    await db.commit()
+    resp = await client.post(f"/api/v1/debates/{debate_id}/lock", headers=headers)
+    assert resp.status_code == 200, resp.text
 
 
 @pytest.mark.asyncio
@@ -38,44 +61,10 @@ async def test_online_debate_requires_settlement_source(client: AsyncClient, see
         "mode": "online",
         "question": "Manchester United will beat Arsenal",
         "side_a_label": "YES", "side_b_label": "NO",
-        "stake_amount": "0", "currency": "UGX",
         "rules": {"required_voters": 0},
     }
     resp = await client.post("/api/v1/debates", json=payload, headers=headers)
     assert resp.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_real_money_stakes_are_rejected_when_payment_mode_is_demo(client, seeded_user, monkeypatch):
-    monkeypatch.setattr(settings, "APP_ENV", "production")
-    monkeypatch.setattr(settings, "ENABLE_REAL_MONEY", True)
-    monkeypatch.setattr(settings, "ENABLE_LOCAL_MONEY", True)
-    monkeypatch.setattr(settings, "PAYMENT_MODE", "demo")
-    payload = _local_debate_payload()
-    payload["stake_amount"] = "1000"
-    headers = await auth_header(client)
-
-    resp = await client.post("/api/v1/debates", json=payload, headers=headers)
-
-    assert resp.status_code == 403
-    assert "live payments" in resp.json()["error"]["message"]
-
-
-@pytest.mark.asyncio
-async def test_real_money_stakes_wait_for_verified_age_support(client, seeded_user, monkeypatch):
-    monkeypatch.setattr(settings, "APP_ENV", "production")
-    monkeypatch.setattr(settings, "ENABLE_REAL_MONEY", True)
-    monkeypatch.setattr(settings, "ENABLE_LOCAL_MONEY", True)
-    monkeypatch.setattr(settings, "PAYMENT_MODE", "live")
-    monkeypatch.setattr(settings, "REQUIRE_AGE_VERIFICATION", True)
-    payload = _local_debate_payload()
-    payload["stake_amount"] = "1000"
-    headers = await auth_header(client)
-
-    resp = await client.post("/api/v1/debates", json=payload, headers=headers)
-
-    assert resp.status_code == 403
-    assert "verified-age records" in resp.json()["error"]["message"]
 
 
 @pytest.mark.asyncio
@@ -92,7 +81,26 @@ async def test_list_and_search_debates(client: AsyncClient, seeded_user):
 
 
 @pytest.mark.asyncio
-async def test_create_invitation_and_share(client: AsyncClient, seeded_user):
+async def test_opponent_invitation_before_lock(client: AsyncClient, seeded_user):
+    """An opponent can be invited while the debate is still open (§4/§5)."""
+    headers = await auth_header(client)
+    debate = (await client.post("/api/v1/debates", json=_local_debate_payload(), headers=headers)).json()
+    debate_id = debate["id"]
+
+    inv = await client.post(
+        f"/api/v1/debates/{debate_id}/invitations",
+        json={"kind": "opponent", "max_uses": 1, "expires_in_hours": 72},
+        headers=headers,
+    )
+    assert inv.status_code == 200, inv.text
+    assert inv.json()["token"]
+    # DB ids are never exposed in the public invite URL.
+    assert debate_id not in inv.json()["invite_url"]
+
+
+@pytest.mark.asyncio
+async def test_voter_invitation_requires_lock(client: AsyncClient, seeded_user):
+    """Voter invitations only open after both debators agree and lock (§6)."""
     headers = await auth_header(client)
     debate = (await client.post("/api/v1/debates", json=_local_debate_payload(), headers=headers)).json()
     debate_id = debate["id"]
@@ -102,9 +110,23 @@ async def test_create_invitation_and_share(client: AsyncClient, seeded_user):
         json={"kind": "voter", "max_uses": 10, "expires_in_hours": 24},
         headers=headers,
     )
-    assert inv.status_code == 200
+    assert inv.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_voter_invitation_and_share_after_lock(client: AsyncClient, seeded_user, db):
+    headers = await auth_header(client)
+    debate = (await client.post("/api/v1/debates", json=_local_debate_payload(), headers=headers)).json()
+    debate_id = debate["id"]
+    await _lock_debate(client, db, debate_id, headers)
+
+    inv = await client.post(
+        f"/api/v1/debates/{debate_id}/invitations",
+        json={"kind": "voter", "max_uses": 10, "expires_in_hours": 24},
+        headers=headers,
+    )
+    assert inv.status_code == 200, inv.text
     assert inv.json()["token"]
-    # DB ids are not exposed in the public invite URL.
     assert debate_id not in inv.json()["invite_url"]
 
     share = await client.get(f"/api/v1/debates/{debate_id}/share", headers=headers)
@@ -113,11 +135,12 @@ async def test_create_invitation_and_share(client: AsyncClient, seeded_user):
 
 
 @pytest.mark.asyncio
-async def test_voting_requires_invitation(client: AsyncClient, seeded_user):
+async def test_voting_requires_invitation(client: AsyncClient, seeded_user, db):
     headers = await auth_header(client)
     debate = (await client.post("/api/v1/debates", json=_local_debate_payload(), headers=headers)).json()
     debate_id = debate["id"]
-    # The creator is not a registered voter, so voting must be rejected.
+    await _lock_debate(client, db, debate_id, headers)
+    # The creator is a debator, not a registered voter, so voting must be rejected.
     resp = await client.post(
         f"/api/v1/debates/{debate_id}/vote", json={"choice": "side_a"}, headers=headers
     )
@@ -134,7 +157,6 @@ async def test_cannot_lock_without_both_sides(client: AsyncClient, seeded_user):
 
 @pytest.mark.asyncio
 async def test_categories_seeded_and_listed(client: AsyncClient, seeded_user, db):
-    # Seed categories directly for this test.
     from app.models.category import Category, DEFAULT_CATEGORIES
 
     existing = (await client.get("/api/v1/categories")).json()

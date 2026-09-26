@@ -87,7 +87,7 @@ class UserPreferences(BaseModel):
     profile_public: Mapped[bool] = mapped_column(Boolean, default=True)
     allow_invitations: Mapped[bool] = mapped_column(Boolean, default=True)
     show_tutorial: Mapped[bool] = mapped_column(Boolean, default=True)
-    theme: Mapped[str] = mapped_column(String(20), default="dark")
+    theme: Mapped[str] = mapped_column(String(20), default="system")
 
     user: Mapped["User"] = relationship(back_populates="preferences")
 

@@ -1,8 +1,7 @@
-"""Notification service (§45).
+"""Notification service.
 
 Creates in-app notifications immediately and enqueues email/SMS/push delivery
-through the background worker. Sensitive financial details are never pushed
-through insecure channels.
+through the background worker.
 """
 from __future__ import annotations
 

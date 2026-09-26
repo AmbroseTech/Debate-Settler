@@ -57,6 +57,16 @@ class Settings(BaseSettings):
     MAX_MEDIA_UPLOAD_MB: int = 25
     MAX_VIDEO_SECONDS: int = 120
 
+    # --- Media storage ---
+    MEDIA_ROOT: str = "media"
+    MAX_IMAGE_UPLOAD_MB: int = 8
+    ALLOWED_IMAGE_TYPES: List[str] = Field(
+        default_factory=lambda: ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    )
+    ALLOWED_VIDEO_TYPES: List[str] = Field(
+        default_factory=lambda: ["video/mp4", "video/webm", "video/quicktime"]
+    )
+
     # --- Notifications ---
     EMAIL_API_KEY: str = ""
     EMAIL_FROM: str = "no-reply@debate-settler.local"

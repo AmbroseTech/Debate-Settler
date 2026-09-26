@@ -51,7 +51,6 @@ class DisputeOut(BaseModel):
     reason: str
     evidence: Optional[str] = None
     status: DisputeStatus
-    payout_on_hold: bool
     resolution_notes: Optional[str] = None
     created_at: datetime
 

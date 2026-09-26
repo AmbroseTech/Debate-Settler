@@ -26,6 +26,7 @@ from app.models.debate import (
 from app.models.notification import AuditLog, Dispute, Game, Notification
 from app.models.user import Follow, Profile, User, UserPreferences, UserSession
 from app.models.debate import DebateComment, DebateCommentReaction
+from app.models.media import Media
 
 __all__ = [
     "Base",
@@ -49,6 +50,7 @@ __all__ = [
     "Dispute",
     "AuditLog",
     "Game",
+    "Media",
     # enums
     "UserRole",
     "UserStatus",

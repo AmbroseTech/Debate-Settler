@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
-from decimal import Decimal
 from typing import AsyncGenerator
 
 import pytest
@@ -13,15 +12,12 @@ from httpx import ASGITransport, AsyncClient
 
 # Use SQLite for tests so no external DB is required.
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
-os.environ["PAYMENT_MODE"] = "demo"
-os.environ["ENABLE_REAL_MONEY"] = "false"
 
 from app.core.database import Base, engine, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.models.base import UserRole  # noqa: E402
 from app.models.user import Profile, User, UserPreferences  # noqa: E402
-from app.services import ledger_service  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: E402
 
 
@@ -68,8 +64,6 @@ async def seeded_user(db: AsyncSession) -> User:
     await db.flush()
     db.add(Profile(user_id=user.id, display_name="Tester"))
     db.add(UserPreferences(user_id=user.id))
-    wallet = await ledger_service.get_or_create_wallet(db, user.id, "UGX")
-    await ledger_service.credit_available(db, wallet, Decimal("100000.00"), is_demo=True)
     await db.commit()
     return user
 

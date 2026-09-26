@@ -1,7 +1,7 @@
-"""Admin endpoints (/api/v1/admin) — permission-controlled (§43).
+"""Admin endpoints (/api/v1/admin) — permission-controlled.
 
-Sensitive financial actions require moderator/admin role. Admins can submit a
-verified settlement result for online debates and manage disputes/users.
+Sensitive moderation actions require moderator/admin role. Admins can submit a
+verified result for online debates and manage disputes/users.
 """
 from __future__ import annotations
 
