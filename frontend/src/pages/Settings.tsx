@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { authApi, usersApi, friendlyError } from '../api/client'
 import { useAuth } from '../store/auth'
+import { applyTheme, type ThemePref } from '../utils/theme'
 import { Explain, Field, Spinner } from '../components/ui'
 
 interface Prefs {
@@ -11,7 +12,7 @@ interface Prefs {
 }
 
 const TOGGLES: { key: keyof Prefs; label: string; hint: string }[] = [
-  { key: 'notify_in_app', label: 'In-app notifications', hint: 'Show updates inside Debate_Settler.' },
+  { key: 'notify_in_app', label: 'In-app notifications', hint: 'Show updates inside Debate Settler.' },
   { key: 'notify_email', label: 'Email notifications', hint: 'Email me about debate activity.' },
   { key: 'notify_push', label: 'Push notifications', hint: 'Browser push alerts where supported.' },
   { key: 'notify_sms', label: 'SMS notifications', hint: 'Text messages where configured.' },
@@ -46,7 +47,14 @@ export default function Settings() {
   const [pw, setPw] = useState({ current_password: '', new_password: '', confirm: '' })
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
-  useEffect(() => { if (prefs && !form) setForm(prefs) }, [prefs, form])
+  useEffect(() => {
+    if (prefs && !form) {
+      setForm(prefs)
+      // Reflect the account's saved theme on this device too.
+      const t = (prefs.theme === 'light' || prefs.theme === 'dark' || prefs.theme === 'system') ? prefs.theme : 'system'
+      applyTheme(t as ThemePref)
+    }
+  }, [prefs, form])
 
   const savePrefs = useMutation({
     mutationFn: (body: Partial<Prefs>) => usersApi.updatePreferences(body),
@@ -67,6 +75,18 @@ export default function Settings() {
     savePrefs.mutate({ [key]: value } as Partial<Prefs>)
   }
 
+  const THEMES: { value: ThemePref; label: string; icon: string }[] = [
+    { value: 'light', label: 'Light', icon: '☀️' },
+    { value: 'dark', label: 'Dark', icon: '🌙' },
+    { value: 'system', label: 'System', icon: '🖥️' },
+  ]
+
+  const setTheme = (value: ThemePref) => {
+    setForm({ ...form, theme: value })
+    applyTheme(value)
+    savePrefs.mutate({ theme: value } as Partial<Prefs>)
+  }
+
   const pwValid = pw.new_password.length >= 8 && pw.new_password === pw.confirm && pw.current_password.length > 0
 
   return (
@@ -75,6 +95,23 @@ export default function Settings() {
         <h1 style={{ margin: 0 }}>⚙️ Settings</h1>
         {saved && <span className="badge badge-settled">Saved ✓</span>}
       </div>
+
+      <section className="col" style={{ gap: 10 }}>
+        <h2 style={{ fontSize: '1.1rem' }}>Appearance</h2>
+        <Explain>Choose Light, Dark, or follow your device with System. Your choice is saved to your account and this device.</Explain>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {THEMES.map((t) => (
+            <button
+              key={t.value}
+              className={`btn btn-sm ${form.theme === t.value ? 'btn-primary' : 'btn-secondary'}`}
+              aria-pressed={form.theme === t.value}
+              onClick={() => setTheme(t.value)}
+            >
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="col" style={{ gap: 10 }}>
         <h2 style={{ fontSize: '1.1rem' }}>Notifications & privacy</h2>

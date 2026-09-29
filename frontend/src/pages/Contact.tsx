@@ -7,7 +7,7 @@ export default function Contact() {
 
   // Compose a mailto link — we never pretend a message was delivered server-side.
   const mailto = `mailto:support@debatesettler.example?subject=${encodeURIComponent(
-    form.subject || 'Debate_Settler support'
+    form.subject || 'Debate Settler support'
   )}&body=${encodeURIComponent(`${form.message}\n\n— ${form.name} (${form.email})`)}`
 
   const canSend = form.email.includes('@') && form.message.trim().length >= 10
@@ -20,7 +20,7 @@ export default function Contact() {
       </div>
 
       <Explain>
-        For anything involving money or a disputed result, please include the debate
+        For anything involving a disputed result, please include the debate
         reference so our team can find it quickly.
       </Explain>
 

@@ -1,13 +1,12 @@
-// Debate card — immediately shows what's debated, who decides, when it ends,
-// and what happens to money (§48, §86, §87, §99).
+// Debate card — immediately shows what's debated, who decides, and when it ends
+// (§48, §86, §87, §99). Debate Settler is free — there is no money involved.
 import { Link } from 'react-router-dom'
 import type { DebateBrief } from '../types'
-import { formatMoney, timeUntil } from '../utils/format'
+import { timeUntil } from '../utils/format'
 import StatusBadge from './StatusBadge'
 
 export default function DebateCard({ debate }: { debate: DebateBrief }) {
   const isLocal = debate.mode === 'local'
-  const hasStake = parseFloat(debate.stake_amount) > 0
 
   return (
     <article className="card card-hover debate-card">
@@ -37,7 +36,6 @@ export default function DebateCard({ debate }: { debate: DebateBrief }) {
             {debate.settlement_source && <span>🌍 {debate.settlement_source}</span>}
           </>
         )}
-        {hasStake && <span>💰 {formatMoney(debate.stake_amount, debate.currency)} each</span>}
         <span>⏱️ {isLocal ? 'Ends' : 'Event'}: {timeUntil(debate.end_at)}</span>
         <span>👥 {debate.participants_count}</span>
       </div>

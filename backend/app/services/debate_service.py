@@ -1,6 +1,6 @@
 """Debate service: creation wizard, invitations, voting, locking (§10-§22).
 
-The backend is the source of truth for rules, votes, deadlines and stakes.
+The backend is the source of truth for rules, votes and deadlines.
 Once a debate is locked its core terms are immutable (§81). Time comparisons
 always use the server clock, never the client's (§14).
 """
@@ -39,7 +39,6 @@ from app.models.debate import (
     DebateVote,
 )
 from app.models.user import User
-from app.payments.registry import real_money_enabled
 from app.schemas.debate import DebateCreate
 from app.services import notification_service
 from app.services.audit_service import record_audit
@@ -62,21 +61,6 @@ async def create_debate(db: AsyncSession, user: User, data: DebateCreate) -> Deb
         raise ValidationError(
             "An Online Result Debate needs an agreed settlement source before it can be created."
         )
-<<<<<<< HEAD
-=======
-    if data.stake_amount > 0:
-        demo_stakes = settings.APP_ENV != "production" and settings.PAYMENT_MODE == "demo"
-        live_stakes = real_money_enabled() and settings.ENABLE_LOCAL_MONEY
-        if not (demo_stakes or live_stakes):
-            raise FeatureDisabledError(
-                "Money debates are unavailable until live payments and local money are configured."
-            )
-        if live_stakes:
-            raise FeatureDisabledError(
-                "Money debates are unavailable until this project has verified-age records and eligibility checks."
-            )
-
->>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
     debate = Debate(
         creator_id=user.id,
         category_id=data.category_id,

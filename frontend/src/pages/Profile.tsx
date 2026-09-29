@@ -1,10 +1,13 @@
 // Profile — your public identity and debate record (§52).
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { usersApi, friendlyError } from '../api/client'
+import { usersApi, mediaApi, friendlyError } from '../api/client'
 import { useAuth } from '../store/auth'
 import { Explain, Field, Spinner } from '../components/ui'
 import type { User } from '../types'
+
+const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_AVATAR_MB = 8
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
@@ -40,12 +43,38 @@ export default function Profile() {
 
   const update = (k: keyof typeof form, v: string) => { setForm({ ...form, [k]: v }); setDirty(true) }
 
+  const avatarInput = useRef<HTMLInputElement>(null)
+
+  const uploadAvatar = useMutation({
+    mutationFn: (file: File) => mediaApi.uploadAvatar(file),
+    onSuccess: (res) => {
+      setForm((f) => ({ ...f, avatar_url: res.url }))
+      qc.invalidateQueries({ queryKey: ['me'] }); loadUser()
+      setMsg({ ok: true, text: 'Profile picture updated.' })
+      if (avatarInput.current) avatarInput.current.value = ''
+    },
+    onError: (e) => setMsg({ ok: false, text: friendlyError(e) }),
+  })
+
+  function pickAvatar(file: File | undefined) {
+    setMsg(null)
+    if (!file) return
+    if (!AVATAR_TYPES.includes(file.type)) { setMsg({ ok: false, text: 'Choose a JPEG, PNG or WebP image.' }); return }
+    if (file.size > MAX_AVATAR_MB * 1024 * 1024) { setMsg({ ok: false, text: `Image is too large — the limit is ${MAX_AVATAR_MB} MB.` }); return }
+    uploadAvatar.mutate(file)
+  }
+
   return (
     <div className="col" style={{ gap: 24, maxWidth: 720, margin: '0 auto', width: '100%' }}>
       <div className="card row" style={{ gap: 16, alignItems: 'center' }}>
-        <div className="splash-logo" style={{ width: 64, height: 64, fontSize: '1.4rem', borderRadius: '50%' }}>
-          {displayName.slice(0, 2).toUpperCase()}
-        </div>
+        {(profile?.avatar_url || form.avatar_url) ? (
+          <img src={form.avatar_url || profile?.avatar_url || ''} alt="Your profile picture"
+            style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+        ) : (
+          <div className="splash-logo" style={{ width: 64, height: 64, fontSize: '1.4rem', borderRadius: '50%' }}>
+            {displayName.slice(0, 2).toUpperCase()}
+          </div>
+        )}
         <div className="grow">
           <h1 style={{ margin: 0 }}>{profile?.display_name || me.username}</h1>
           <div className="muted">@{me.username} · <span className="badge badge-active">{me.role}</span></div>
@@ -72,9 +101,14 @@ export default function Profile() {
           <textarea className="input textarea" rows={3} maxLength={1000}
             value={form.bio || profile?.bio || ''} onChange={(e) => update('bio', e.target.value)} />
         </Field>
-        <Field label="Avatar URL" hint="Optional link to a profile image.">
-          <input className="input" value={form.avatar_url || profile?.avatar_url || ''}
-            onChange={(e) => update('avatar_url', e.target.value)} maxLength={500} />
+        <Field label="Profile picture" hint="JPEG, PNG or WebP up to 8 MB.">
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <label className="btn btn-secondary" style={{ cursor: uploadAvatar.isPending ? 'wait' : 'pointer' }}>
+              {uploadAvatar.isPending ? 'Uploading…' : 'Upload picture'}
+              <input ref={avatarInput} type="file" accept={AVATAR_TYPES.join(',')} hidden disabled={uploadAvatar.isPending}
+                onChange={(e) => pickAvatar(e.target.files?.[0])} />
+            </label>
+          </div>
         </Field>
         {msg && <div className={msg.ok ? 'help-text' : 'error-text'} role="status">{msg.text}</div>}
         <div>

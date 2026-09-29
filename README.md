@@ -1,24 +1,25 @@
-# Debate_Settler (DS)
+# Debate Settler
 
-A social debate and competitive challenge platform where people create debates,
-challenge friends or other users, invite audiences, vote, settle verifiable
-future events, and — where legally permitted and properly configured — attach
-financial stakes through a transparent wallet.
+A **free** global social debate platform. People create a debate, invite an
+opponent, agree on the rules, lock it, then invite an audience to watch and
+vote. The result is decided by real people or a pre-agreed verifiable source —
+never by money. There are no wallets, stakes, fees, deposits, withdrawals or
+payment providers anywhere on the platform.
 
-DS combines a **social network + debate platform + competitive challenge arena +
-transparent wallet**. The whole product is built around one rule: it is always
-obvious
+The whole product is built around one rule: it is always obvious
 
 1. **What** exactly is being debated
 2. **Who** decides the result
 3. **When** it ends
-4. **What happens** to your money
+4. **How** the result is reached
 
 > Powered by VerseTechnologies
 
 ---
 
 ## Two ways to settle a debate
+
+"Settle" here means **decide the winner** — no money is involved.
 
 | Mode | Who decides | Use it when |
 |------|-------------|-------------|
@@ -28,25 +29,25 @@ obvious
 For Online Result Debates the **settlement source and rule are locked before the
 debate starts**. The system never searches the internet after the fact or guesses
 a winner — if the source is unavailable or contradictory the debate goes
-**Under Review**.
+**Under Review**. AI never secretly decides a winner unless the locked rules
+explicitly define an AI-judged debate.
 
 ---
 
 ## Tech stack
 
 **Frontend** — React 18 · TypeScript · Vite · React Router v6 · TanStack Query ·
-Zustand · Axios · modern CSS (mobile-first, accessible).
+Zustand · Axios · modern CSS (mobile-first, accessible, dark/light/system theme).
 
 **Backend** — Python · FastAPI · Pydantic v2 · async SQLAlchemy 2.0 · Alembic ·
 background worker scheduler.
 
-**Data / infra** — PostgreSQL (authoritative for money) · Redis (cache + rate
-limiting) · Docker · Docker Compose.
+**Data / infra** — PostgreSQL (authoritative) · Redis (cache + rate limiting) ·
+Docker · Docker Compose.
 
 **No required AI dependency.** Trending, recommendations and search use
 traditional signals (engagement, votes, participants, recency, category
-popularity). AI can be added later as an optional feature; the core app works
-without it.
+popularity).
 
 ---
 
@@ -60,33 +61,16 @@ flowchart LR
   UI -->|REST /api/v1| API[FastAPI backend]
   API --> PG[(PostgreSQL)]
   API --> RD[(Redis)]
+  API --> MD[Media storage]
   WK[Background worker] --> PG
   WK --> RD
-  API --> PAY[Payment provider adapters]
-  PAY --> DEMO[Demo provider]
-  PAY --> MM[MTN / Airtel]
-  PAY --> CARD[Stripe / PayPal]
-  API --> LED[Double-entry ledger]
-  LED --> PG
+  WK --> NTF[Reminders & notifications]
+  API --> STL[Settlement / winner resolution]
+  STL --> PG
 ```
 
-### Money flow (double-entry)
-
-```mermaid
-flowchart TD
-  A[Deposit] --> W[Wallet: available]
-  W -->|fund stake| L[Wallet: locked]
-  L -->|settle| S{Winner?}
-  S -->|winner| P[Winner payout = pool - platform fee]
-  S -->|draw| R[Stakes returned]
-  S -->|dispute| H[Payout ON HOLD]
-  P --> W2[Wallet: available]
-  R --> W2
-```
-
-Money always uses `Decimal` / PostgreSQL `NUMERIC` — never floats. Every movement
-is recorded as balanced ledger entries with a unique transaction reference, and
-financial rows are **never deleted** (reversals/refunds instead).
+Debate results use authenticated, de-duplicated, rate-limited votes. The server
+clock is authoritative for voting windows and deadlines.
 
 ---
 
@@ -96,15 +80,14 @@ financial rows are **never deleted** (reversals/refunds instead).
 Debate-Settler/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/          # auth, debates, wallet, users, admin, misc routers
-│   │   ├── core/            # config, database, redis, security, money, exceptions
-│   │   ├── db/seed.py       # idempotent seed (categories, users, wallets, debates)
-│   │   ├── models/          # SQLAlchemy models + enums
-│   │   ├── payments/        # provider adapters (demo, MTN, Airtel, Stripe, PayPal)
+│   │   ├── api/v1/          # auth, debates, users, media, admin, misc routers
+│   │   ├── core/            # config, database, redis, security, exceptions
+│   │   ├── db/seed.py       # idempotent seed (categories, users, debates)
+│   │   ├── models/          # SQLAlchemy models + enums (debate, media, comment…)
 │   │   ├── schemas/         # Pydantic request/response models
-│   │   ├── services/        # auth, debate, wallet, ledger, notification, audit
-│   │   ├── settlements/     # settlement engine (local votes + online results)
-│   │   ├── workers/jobs.py  # scheduler: close debates, funding timeouts, payments
+│   │   ├── services/        # auth, debate, media, notification, audit
+│   │   ├── settlements/     # winner resolution (local votes + online results)
+│   │   ├── workers/jobs.py  # scheduler: close debates, reminders, notifications
 │   │   └── main.py          # FastAPI app
 │   ├── migrations/          # Alembic
 │   ├── tests/               # pytest (SQLite in-memory)
@@ -115,10 +98,10 @@ Debate-Settler/
 │   │   ├── api/client.ts    # typed Axios API surface
 │   │   ├── components/      # Splash, DebateCard, StatusBadge, ui primitives
 │   │   ├── layouts/         # DashboardLayout (header, sidebar, mobile nav)
-│   │   ├── pages/           # dashboard, discover, create, debate, wallet, admin…
+│   │   ├── pages/           # dashboard, discover, create, debate, profile, admin…
 │   │   ├── store/auth.ts    # Zustand auth store
 │   │   ├── types/           # shared TS types mirroring the backend
-│   │   └── utils/format.ts  # money/date/status formatting
+│   │   └── utils/format.ts  # date/status/timezone formatting
 │   ├── nginx.conf
 │   └── Dockerfile
 ├── docker-compose.yml
@@ -139,7 +122,7 @@ docker compose up --build
 - Backend API: http://localhost:8000 (health: `/health`, docs: `/docs`)
 - The backend container runs `alembic upgrade head` before serving.
 
-To load demo data (categories, users, wallets, sample debates):
+To load demo data (categories, users, sample debates):
 
 ```bash
 docker compose exec backend python -m app.db.seed
@@ -152,9 +135,6 @@ Seeded logins (password `Password123!`):
 | `ambrose` | admin |
 | `grace` | user |
 | `ivan` | moderator |
-
-> Seed wallets are funded with clearly-marked **DEMO** balances. Demo mode never
-> moves real money.
 
 ---
 
@@ -192,7 +172,7 @@ npm run dev          # http://localhost:5173 (proxies /api to :8000)
 
 ```bash
 cd backend
-pytest            # uses SQLite in-memory + demo payment mode
+pytest            # uses SQLite in-memory
 ```
 
 ```bash
@@ -208,32 +188,29 @@ npm run build     # production build
 All configuration is via environment variables — see [`.env.example`](.env.example).
 Nothing secret is hard-coded. Key groups:
 
+- **App** — `APP_NAME`, `APP_ENV`, `DEBUG`, `API_V1_PREFIX`, `FRONTEND_URL`, `BACKEND_URL`.
+- **Database / cache** — `DATABASE_URL`, `SYNC_DATABASE_URL`, `REDIS_URL`, pool sizes.
 - **Security** — `SECRET_KEY`, `JWT_SECRET`, token lifetimes, CORS, rate limits,
   account lockout.
-- **Compliance flags** — `ENABLE_REAL_MONEY`, `ENABLE_LOCAL_MONEY`,
-  `ENABLE_WITHDRAWALS`, `REQUIRE_KYC`, `REQUIRE_AGE_VERIFICATION` (all default
-  **false**), `ENABLE_GAMES` (default true, free play only).
-- **Financial** — `PLATFORM_FEE_PERCENT` (configurable, disclosed before any
-  commitment), `WITHDRAWAL_FEE_PERCENT`, `FUNDING_TIMEOUT_MINUTES`,
-  `DEFAULT_CURRENCY`.
-- **Payments** — `PAYMENT_MODE` (`demo` | `live`) and per-provider credentials.
+- **Features** — `ENABLE_GAMES` (free play only).
+- **Media** — `MEDIA_ROOT`, `MAX_MEDIA_UPLOAD_MB`, `MAX_IMAGE_UPLOAD_MB`,
+  `MAX_VIDEO_SECONDS`, and the allowed image/video content-type lists.
+- **Notifications** — `EMAIL_API_KEY`, `EMAIL_FROM`, `SMS_API_KEY`.
 
 ---
 
 ## Security & compliance principles
 
-- The **backend is the source of truth** for balances, stakes, fees, votes,
-  winners and deadlines. The frontend is never trusted for money or results.
-- **Never** fake a payment success; a request is only marked complete once the
-  provider confirms it. Webhooks are idempotent (no double-credit).
-- Financial features are gated by jurisdiction/compliance flags and only enabled
-  where legally permitted and properly configured. The app never claims to be
-  "fully licensed".
+- The **backend is the source of truth** for debates, votes, winners and
+  deadlines. The frontend is never trusted for results.
+- Uploaded media is validated (content-type allowlist, size caps, image/video
+  verification) with safe, generated filenames. Private uploads are never exposed
+  publicly unless the debate itself is public.
 - Passwords are hashed (bcrypt); secrets, tokens and DB ids are never exposed in
   the frontend or public URLs.
-- Votes are authenticated, de-duplicated and rate-limited; the server clock is
-  authoritative for voting windows.
-- Admin/financial actions are recorded in a **hash-chained audit log**.
+- Votes are authenticated, de-duplicated and rate-limited; the comment system is
+  kept separate from the official voting system.
+- Admin/moderation actions are recorded in a **hash-chained audit log**.
 - Users never see raw stack traces — errors return friendly, plain-English
   messages.
 

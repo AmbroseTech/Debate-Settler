@@ -30,7 +30,7 @@ export default function Notifications() {
           ))}
         </div>
       ) : (
-        <EmptyState title="No notifications" subtitle="Updates about your debates, votes and wallet appear here." />
+        <EmptyState title="No notifications" subtitle="Updates about your debates, votes and reminders appear here." />
       )}
     </div>
   )

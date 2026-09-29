@@ -205,10 +205,10 @@ def upgrade() -> None:
         sa.Column("invitation_id", UUID, sa.ForeignKey("debate_invitations.id"), nullable=True),
         sa.Column("is_valid", sa.Boolean(), server_default=sa.true()),
         sa.Column("changed", sa.Boolean(), server_default=sa.false()),
+        sa.UniqueConstraint("debate_id", "voter_id", name="uq_vote_debate_voter"),
     )
     op.create_index("ix_debate_votes_debate_id", "debate_votes", ["debate_id"])
     op.create_index("ix_debate_votes_voter_id", "debate_votes", ["voter_id"])
-    op.create_unique_constraint("uq_vote_debate_voter", "debate_votes", ["debate_id", "voter_id"])
 
     op.create_table(
         "debate_events",

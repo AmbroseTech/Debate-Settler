@@ -1,7 +1,6 @@
 // Invitation landing page for /join/:token (§16).
-import { useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { debatesApi, friendlyError } from '../api/client'
 import { useAuth } from '../store/auth'
 import { Explain, Spinner } from '../components/ui'
@@ -22,12 +21,21 @@ export default function JoinDebate() {
     onError: (e) => setError(friendlyError(e, 'This invitation is not valid or has expired.')),
   })
 
-  useEffect(() => {
-    // Only auto-accept once we know the auth state.
-    if (initialized && user && !accept.isIdle) return
-    if (initialized && user) accept.mutate()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialized, user])
+  const decline = useMutation({
+    mutationFn: () => debatesApi.declineInvitation(token),
+    onSuccess: () => navigate('/discover'),
+    onError: (e) => setError(friendlyError(e, 'This invitation is not valid or has expired.')),
+  })
+
+  const pending = accept.isPending || decline.isPending
+
+  const { data: invite } = useQuery({
+    queryKey: ['invitation', token],
+    queryFn: () => debatesApi.invitationDetails(token),
+    enabled: !!token,
+    retry: false,
+  })
+  const isOpponent = invite?.kind === 'opponent'
 
   if (!initialized) return <Spinner />
 
@@ -48,13 +56,18 @@ export default function JoinDebate() {
             <Link className="btn btn-primary btn-block" to="/auth">Sign in to join</Link>
             <Link className="btn btn-secondary btn-block" to="/auth">Create an account</Link>
           </div>
-        ) : accept.isPending ? (
-          <Spinner label="Joining…" />
+        ) : pending ? (
+          <Spinner label="Working…" />
         ) : (
           <div className="col" style={{ gap: 8, marginTop: 16 }}>
             <button className="btn btn-primary btn-block" onClick={() => accept.mutate()}>
-              Join debate
+              {isOpponent ? 'Accept & debate' : 'Accept & join'}
             </button>
+            {isOpponent && (
+              <button className="btn btn-secondary btn-block" onClick={() => decline.mutate()}>
+                Decline challenge
+              </button>
+            )}
             <Link className="btn btn-ghost btn-block" to="/">Back to home</Link>
           </div>
         )}

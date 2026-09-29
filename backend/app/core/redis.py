@@ -1,7 +1,7 @@
 """Redis client for caching, rate limiting and ephemeral data.
 
-Never use Redis as the source of truth for financial balances — PostgreSQL is
-authoritative. This module provides a small typed helper API.
+Never use Redis as the source of truth — PostgreSQL is authoritative.
+This module provides a small typed helper API.
 
 Resilience: if Redis is unreachable, the helpers transparently fall back to a
 best-effort in-process store so a single-instance deployment (and the test

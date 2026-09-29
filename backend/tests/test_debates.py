@@ -5,12 +5,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-<<<<<<< HEAD
 from app.models.base import ParticipantRole, Side
 from app.models.debate import DebateParticipant
-=======
-from app.core.config import settings
->>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
 from tests.conftest import auth_header
 
 
@@ -69,39 +65,6 @@ async def test_online_debate_requires_settlement_source(client: AsyncClient, see
     }
     resp = await client.post("/api/v1/debates", json=payload, headers=headers)
     assert resp.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_real_money_stakes_are_rejected_when_payment_mode_is_demo(client, seeded_user, monkeypatch):
-    monkeypatch.setattr(settings, "APP_ENV", "production")
-    monkeypatch.setattr(settings, "ENABLE_REAL_MONEY", True)
-    monkeypatch.setattr(settings, "ENABLE_LOCAL_MONEY", True)
-    monkeypatch.setattr(settings, "PAYMENT_MODE", "demo")
-    payload = _local_debate_payload()
-    payload["stake_amount"] = "1000"
-    headers = await auth_header(client)
-
-    resp = await client.post("/api/v1/debates", json=payload, headers=headers)
-
-    assert resp.status_code == 403
-    assert "live payments" in resp.json()["error"]["message"]
-
-
-@pytest.mark.asyncio
-async def test_real_money_stakes_wait_for_verified_age_support(client, seeded_user, monkeypatch):
-    monkeypatch.setattr(settings, "APP_ENV", "production")
-    monkeypatch.setattr(settings, "ENABLE_REAL_MONEY", True)
-    monkeypatch.setattr(settings, "ENABLE_LOCAL_MONEY", True)
-    monkeypatch.setattr(settings, "PAYMENT_MODE", "live")
-    monkeypatch.setattr(settings, "REQUIRE_AGE_VERIFICATION", True)
-    payload = _local_debate_payload()
-    payload["stake_amount"] = "1000"
-    headers = await auth_header(client)
-
-    resp = await client.post("/api/v1/debates", json=payload, headers=headers)
-
-    assert resp.status_code == 403
-    assert "verified-age records" in resp.json()["error"]["message"]
 
 
 @pytest.mark.asyncio

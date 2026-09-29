@@ -1,12 +1,6 @@
 // Formatting helpers for dates and debate status labels.
 import type { DebateStatus } from '../types'
 
-export function formatMoney(amount: string | number, currency = 'UGX'): string {
-  const n = typeof amount === 'string' ? parseFloat(amount) : amount
-  if (Number.isNaN(n)) return `${currency} 0.00`
-  return `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
 export function formatDate(iso?: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)

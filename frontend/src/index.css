@@ -1,4 +1,4 @@
-/* Debate_Settler design system.
+/* Debate Settler design system.
    Premium, trustworthy, competitive. Strong hierarchy, no generic AI gradients,
    no excessive glassmorphism. Mobile-first, accessible contrast. */
 
@@ -24,6 +24,30 @@
   --maxw: 1200px;
   --acid: #d1ff73;
   --ink: #080b10;
+}
+
+/* Light theme — applied when <html data-theme="light"> (see utils/theme.ts). */
+:root[data-theme="light"] {
+  --bg: #f4f6fb;
+  --bg-elevated: #ffffff;
+  --bg-card: #ffffff;
+  --border: #d9e0ec;
+  --border-strong: #bcc8db;
+  --text: #12203a;
+  --text-muted: #4a5b76;
+  --text-dim: #6b7b95;
+  --accent: #0f9d58;
+  --accent-hover: #0b7d46;
+  --success: #0f9d58;
+  --warning: #b8791f;
+  --danger: #cf3b48;
+  --draw: #6c5ce7;
+  --acid: #0f9d58;
+  --ink: #ffffff;
+}
+
+:root[data-theme="light"] body {
+  background: radial-gradient(circle at 80% -10%, #dfe8f7 0, transparent 31rem), var(--bg);
 }
 
 * { box-sizing: border-box; }
@@ -219,30 +243,6 @@ p { margin: 0 0 1em; }
 .stat-value { font-size: 1.8rem; font-weight: 750; letter-spacing: -.04em; }
 .stat-label { font-size: 0.8rem; color: var(--text-muted); }
 
-/* --- Wallet --- */
-.balance-hero { background: linear-gradient(135deg, var(--bg-card), var(--bg-elevated)); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
-.balance-amount { font-size: 2.2rem; font-weight: 750; letter-spacing: -0.02em; }
-.demo-tag { display: inline-block; background: rgba(245, 166, 35, 0.15); color: var(--warning); border: 1px solid rgba(245, 166, 35, 0.4); padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
-.payment-availability { display: flex; align-items: center; gap: 13px; padding: 15px 17px; border: 1px solid var(--border); border-radius: 12px; background: rgba(17,26,44,.72); }
-.payment-mark { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; color: var(--acid); background: rgba(209,255,115,.1); font-weight: 800; }
-.payment-availability strong { font-size: .86rem; }
-.payment-availability p { margin: 3px 0 0; color: var(--text-muted); font-size: .78rem; }
-.payment-availability p span { color: var(--text-dim); }
-.game-mode-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.game-mode-option { display: flex; align-items: center; gap: 14px; padding: 18px; min-height: 86px; text-align: left; color: var(--text); background: rgba(17,26,44,.8); border: 1px solid var(--border); border-radius: 14px; cursor: pointer; font: inherit; transition: border-color .16s, background .16s, transform .16s; }
-.game-mode-option:hover { border-color: var(--border-strong); transform: translateY(-2px); }
-.game-mode-option.selected { border-color: var(--acid); background: linear-gradient(110deg, rgba(209,255,115,.11), rgba(17,26,44,.86)); box-shadow: inset 0 0 0 1px rgba(209,255,115,.15); }
-.game-mode-symbol { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; border-radius: 12px; background: rgba(255,255,255,.055); color: var(--acid); font-size: 1.2rem; }
-.game-mode-option strong, .game-mode-option small { display: block; }
-.game-mode-option strong { font-size: .93rem; }
-.game-mode-option small { margin-top: 3px; color: var(--text-muted); font-size: .74rem; line-height: 1.4; }
-.game-mode-check { margin-left: auto; color: var(--acid); font-size: .78rem; }
-.money-mode-panel { max-width: 780px; padding: clamp(24px, 4vw, 42px); border: 1px solid rgba(209,255,115,.23); border-radius: 8px 48px 8px 8px; background: radial-gradient(circle at 100% 0%, rgba(209,255,115,.1), transparent 18rem), #101924; }
-.money-mode-kicker { color: var(--acid); font-size: .65rem; font-weight: 850; letter-spacing: .15em; }
-.money-mode-panel h2 { margin: 14px 0 10px; font-size: clamp(1.55rem, 4vw, 2.3rem); letter-spacing: -.045em; }
-.money-mode-panel > p { max-width: 600px; color: var(--text-muted); line-height: 1.65; }
-.money-mode-note { display: flex; gap: 10px; max-width: 640px; padding: 13px 15px; margin: 20px 0; border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); font-size: .79rem; line-height: 1.5; background: rgba(5,10,16,.32); }
-.money-mode-note > span:first-child { color: var(--warning); }
 
 /* --- Wizard (§10) --- */
 .wizard-steps { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
@@ -300,7 +300,6 @@ p { margin: 0 0 1em; }
   .dashboard-hero { min-height: 0; padding: 26px 20px 34px; }
   .dashboard-versus { display: none; }
   .dashboard-section-heading > span { display: none; }
-  .game-mode-picker { grid-template-columns: 1fr; }
   .sidebar {
     position: fixed; left: 0; top: 0; z-index: 50; transform: translateX(-100%);
     transition: transform 0.2s ease; width: 260px;

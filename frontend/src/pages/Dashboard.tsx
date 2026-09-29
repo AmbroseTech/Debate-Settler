@@ -1,11 +1,10 @@
-// Main dashboard (§83): greeting, wallet, stats, trending, active debates.
+// Main dashboard (§83): greeting, activity stats, trending, active debates.
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../store/auth'
-import { debatesApi, walletApi } from '../api/client'
+import { debatesApi } from '../api/client'
 import DebateCard from '../components/DebateCard'
 import { EmptyState, Spinner } from '../components/ui'
-import { formatMoney } from '../utils/format'
 
 function greeting() {
   const h = new Date().getHours()
@@ -16,7 +15,6 @@ function greeting() {
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const { data: wallet } = useQuery({ queryKey: ['wallet'], queryFn: walletApi.get })
   const { data: trending, isLoading: tLoading } = useQuery({ queryKey: ['trending'], queryFn: debatesApi.trending })
   const { data: active } = useQuery({
     queryKey: ['debates', 'active'],
@@ -24,6 +22,7 @@ export default function Dashboard() {
   })
 
   const name = user?.profile?.display_name || user?.username || 'there'
+  const profile = user?.profile
 
   return (
     <div className="col" style={{ gap: 24 }}>
@@ -50,9 +49,9 @@ export default function Dashboard() {
 
       <div className="grid grid-auto">
         <div className="stat">
-          <div className="stat-label">Wallet</div>
-          <div className="stat-value">{wallet ? formatMoney(wallet.available_balance, wallet.currency) : '—'}</div>
-          <Link to="/wallet" className="btn btn-ghost btn-sm" style={{ paddingLeft: 0 }}>View wallet →</Link>
+          <div className="stat-label">Debates Created</div>
+          <div className="stat-value">{profile?.debates_created ?? 0}</div>
+          <Link to="/create" className="btn btn-ghost btn-sm" style={{ paddingLeft: 0 }}>Start one →</Link>
         </div>
         <div className="stat">
           <div className="stat-label">Active Debates</div>
@@ -60,14 +59,16 @@ export default function Dashboard() {
           <Link to="/my-debates" className="btn btn-ghost btn-sm" style={{ paddingLeft: 0 }}>My debates →</Link>
         </div>
         <div className="stat">
-          <div className="stat-label">Locked</div>
-          <div className="stat-value">{wallet ? formatMoney(wallet.locked_balance, wallet.currency) : '—'}</div>
-          <span className="dim" style={{ fontSize: '0.75rem' }}>Committed to active debates</span>
+          <div className="stat-label">Participated</div>
+          <div className="stat-value">{profile?.debates_participated ?? 0}</div>
+          <span className="dim" style={{ fontSize: '0.75rem' }}>Debates you’ve joined</span>
         </div>
         <div className="stat">
-          <div className="stat-label">Pending</div>
-          <div className="stat-value">{wallet ? formatMoney(wallet.pending_balance, wallet.currency) : '—'}</div>
-          <span className="dim" style={{ fontSize: '0.75rem' }}>Awaiting confirmation</span>
+          <div className="stat-label">Wins</div>
+          <div className="stat-value">{profile?.wins ?? 0}</div>
+          <span className="dim" style={{ fontSize: '0.75rem' }}>
+            {profile?.losses ?? 0} losses · {profile?.draws ?? 0} draws
+          </span>
         </div>
       </div>
 

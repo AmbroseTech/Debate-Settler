@@ -80,10 +80,35 @@ export const debatesApi = {
   share: (id: string) => api.get(`/debates/${id}/share`).then(r => r.data),
   acceptInvitation: (token: string) =>
     api.post('/debates/invitations/accept', null, { params: { token } }).then(r => r.data),
+  declineInvitation: (token: string) =>
+    api.post('/debates/invitations/decline', null, { params: { token } }).then(r => r.data),
+  invitationDetails: (token: string) =>
+    api.get<{ kind: string; debate_id: string; question: string; status: string }>(`/debates/invitations/${token}`).then(r => r.data),
 }
 
 export const categoriesApi = {
   list: () => api.get<Category[]>('/categories').then(r => r.data),
+}
+
+export interface CommentOut {
+  id: string
+  debate_id: string
+  parent_id?: string | null
+  user_id: string
+  body: string
+  username?: string | null
+  created_at: string
+  pinned?: boolean
+  reactions?: Record<string, number>
+}
+
+export const commentsApi = {
+  list: (debateId: string) =>
+    api.get<CommentOut[]>(`/debates/${debateId}/comments`).then(r => r.data),
+  create: (debateId: string, body: string, parentId?: string | null) =>
+    api.post<CommentOut>(`/debates/${debateId}/comments`, { body, parent_id: parentId ?? null }).then(r => r.data),
+  react: (debateId: string, commentId: string, reaction: string) =>
+    api.put(`/debates/${debateId}/comments/${commentId}/reaction`, { reaction }).then(r => r.data),
 }
 
 export const notificationsApi = {
@@ -108,6 +133,32 @@ export const gamesApi = {
   types: () => api.get<string[]>('/games/types').then(r => r.data),
   create: (game_type: string) => api.post('/games', { game_type }).then(r => r.data),
   list: () => api.get('/games').then(r => r.data),
+}
+
+export const mediaApi = {
+  // Upload an image or video to a debate. Returns the created media record.
+  upload: (file: File, kind: 'image' | 'video', debateId?: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('kind', kind)
+    if (debateId) form.append('debate_id', debateId)
+    return api
+      .post<{ id: string; kind: string; url: string; content_type: string; status: string }>('/media/upload', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then(r => r.data)
+  },
+  // Upload a new profile picture; also updates the profile's avatar_url.
+  uploadAvatar: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api
+      .post<{ id: string; url: string }>('/media/avatar', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then(r => r.data)
+  },
+  remove: (id: string) => api.delete(`/media/${id}`).then(r => r.data),
 }
 
 export const adminApi = {

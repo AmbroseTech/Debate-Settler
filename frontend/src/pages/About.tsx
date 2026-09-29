@@ -1,18 +1,19 @@
-// About — what Debate_Settler is and the principles it follows (§74, §99).
+// About — what Debate Settler is and the principles it follows (§74, §99).
 import { Explain } from '../components/ui'
 
 export default function About() {
   return (
     <div className="col" style={{ gap: 20, maxWidth: 720, margin: '0 auto', width: '100%' }}>
       <div>
-        <h1>About Debate_Settler</h1>
-        <p className="muted">A social platform to settle any disagreement — fairly, transparently, and once.</p>
+        <h1>About Debate Settler</h1>
+        <p className="muted">A free social platform to settle any disagreement — fairly, transparently, and once.</p>
       </div>
 
       <Explain>
-        Debate_Settler (DS) combines a social network, a debate platform, a competitive
-        challenge arena and a transparent wallet. It is built to make disagreements
-        resolvable instead of endless.
+        Debate Settler (DS) combines a social network, a debate platform and a
+        competitive challenge arena. It is built to make disagreements
+        resolvable instead of endless — and it is completely free. There are no
+        wallets, stakes or payments.
       </Explain>
 
       <section className="card col" style={{ gap: 8 }}>
@@ -21,7 +22,7 @@ export default function About() {
           <li>What exactly is being debated</li>
           <li>Who decides the result</li>
           <li>When it ends</li>
-          <li>What happens to your money</li>
+          <li>How the result is reached</li>
         </ul>
       </section>
 
@@ -39,12 +40,12 @@ export default function About() {
       </section>
 
       <section className="card col" style={{ gap: 8 }}>
-        <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Money, handled honestly</h2>
+        <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Results, handled honestly</h2>
         <p className="muted" style={{ margin: 0 }}>
-          Where financial stakes are used, they are only enabled where legally permitted and
-          properly configured. The platform fee is always shown before you commit, every
-          movement is recorded in an auditable ledger, and money is never kept without a
-          clear status or rule.
+          Every debate makes its rules, decision method and deadline clear before it locks.
+          Votes are authenticated, counted and never manipulated by the platform, and the
+          winner is derived from the rules the participants agreed to — never decided in
+          secret.
         </p>
       </section>
 

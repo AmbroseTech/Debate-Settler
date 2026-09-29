@@ -1,23 +1,13 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { categoriesApi, debatesApi, friendlyError, walletApi } from '../api/client'
+import { categoriesApi, debatesApi, friendlyError } from '../api/client'
 import { Explain, Field } from '../components/ui'
 import type { DebateMode } from '../types'
-import { formatMoney } from '../utils/format'
 
 export default function CreateDebate() {
   const navigate = useNavigate()
-<<<<<<< HEAD
   const [mode, setMode] = useState<DebateMode>('local')
-=======
-  const [searchParams] = useSearchParams()
-  const moneyMode = searchParams.get('money') === '1'
-  const [step, setStep] = useState<Step>(0)
-  const [error, setError] = useState('')
-
-  const [mode, setMode] = useState<DebateMode | ''>('')
->>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
   const [question, setQuestion] = useState('')
   const [sideA, setSideA] = useState('')
   const [sideB, setSideB] = useState('')
@@ -30,53 +20,14 @@ export default function CreateDebate() {
   const [allowDraw, setAllowDraw] = useState(true)
   const [settlementSource, setSettlementSource] = useState('')
   const [settlementRule, setSettlementRule] = useState('')
-<<<<<<< HEAD
-=======
-  const [stake, setStake] = useState(moneyMode ? '' : '0')
->>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
   const [isPublic, setIsPublic] = useState(true)
   const [error, setError] = useState('')
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list })
-<<<<<<< HEAD
-=======
-  const stakeAmount = Number(stake)
-  const feePreview = useQuery({
-    queryKey: ['stake-preview', stakeAmount],
-    queryFn: () => walletApi.stakePreview(stakeAmount),
-    enabled: stakeAmount > 0,
-  })
-
->>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
   const createMutation = useMutation({
     mutationFn: debatesApi.create,
     onSuccess: (debate) => navigate(`/debates/${debate.id}`),
     onError: (err) => setError(friendlyError(err)),
   })
-<<<<<<< HEAD
-=======
-
-  function next() { setError(''); setStep((s) => Math.min(s + 1, STEP_COUNT - 1) as Step) }
-  function back() { setError(''); setStep((s) => Math.max(s - 1, 0) as Step) }
-
-  function validateStep(): boolean {
-    if (step === 0 && !mode) { setError('Choose a debate type to continue.'); return false }
-    if (step === 1) {
-      if (question.trim().length < 3) { setError('Write a clear debate question.'); return false }
-      if (!sideA.trim() || !sideB.trim()) { setError('Both sides need a label.'); return false }
-    }
-    if (step === 3 && mode === 'online' && !settlementSource.trim()) {
-      setError('An Online Result Debate needs an agreed settlement source.'); return false
-    }
-    if (step === 4 && moneyMode && stakeAmount <= 0) {
-      setError('Enter a positive stake for Money Debate mode.'); return false
-    }
-    if (step === 4 && stakeAmount > 0 && !feePreview.data) {
-      setError('Wait for the server fee preview before continuing.'); return false
-    }
-    return true
-  }
-
->>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
   function submit() {
     setError('')
     if (question.trim().length < 3 || !sideA.trim() || !sideB.trim()) {
@@ -95,7 +46,6 @@ export default function CreateDebate() {
         settlement_rule: settlementRule || null, event_date: endAt ? new Date(endAt).toISOString() : null },
     })
   }
-<<<<<<< HEAD
   return <div className="col" style={{ gap: 20, maxWidth: 780, margin: '0 auto', width: '100%' }}>
     <header><span className="badge">CHALLENGE → AGREE → DEBATE → VOTE</span><h1>Create a debate</h1>
       <p className="muted">Set the topic and positions, then invite an opponent to review and agree on the rules.</p></header>
@@ -104,189 +54,6 @@ export default function CreateDebate() {
         <div className="type-emoji">{value === 'local' ? '🌐' : '🔎'}</div><h3>{value === 'local' ? 'COMMUNITY VOTE' : 'ONLINE RESULT'}</h3>
         <p className="muted">{value === 'local' ? 'Invite people to discuss and vote.' : 'Agree on a public source that will decide the result.'}</p>
       </button>)}
-=======
-
-  return (
-    <div className="col" style={{ gap: 20, maxWidth: 720, margin: '0 auto', width: '100%' }}>
-      <div>
-        <h1>{moneyMode ? 'Set up a Money Debate' : 'Create a Debate'}</h1>
-        <p className="muted">{moneyMode ? 'Money mode selected. Stake entry remains locked until account eligibility and live payment verification are ready.' : 'Follow the steps. You can review everything before locking it in.'}</p>
-      </div>
-
-      <div className="wizard-steps" aria-label={`Step ${step + 1} of ${STEP_COUNT}`}>
-        {Array.from({ length: STEP_COUNT }).map((_, i) => (
-          <div key={i} className={`wizard-step ${i <= step ? 'done' : ''}`} />
-        ))}
-      </div>
-
-      {error && <div className="error-text" role="alert">{error}</div>}
-
-      {/* Step 0: choose type (§11) */}
-      {step === 0 && (
-        <div className="grid grid-2">
-          <div className={`card type-card card-hover ${mode === 'local' ? 'card-active' : ''}`} onClick={() => setMode('local')} role="button" tabIndex={0} style={{ outline: mode === 'local' ? '2px solid var(--accent)' : 'none' }}>
-            <div className="type-emoji">🧑‍🤝‍🧑</div>
-            <h3>LOCAL DEBATE</h3>
-            <p className="muted">Let real people decide.</p>
-            <p className="dim" style={{ fontSize: '0.85rem' }}>Use this when people need to watch, evaluate and vote.</p>
-            <div className="explain" style={{ textAlign: 'left' }}>Example: You and a friend disagree about which presentation was better. Invite 30 people to watch and vote.</div>
-          </div>
-          <div className={`card type-card card-hover`} onClick={() => setMode('online')} role="button" tabIndex={0} style={{ outline: mode === 'online' ? '2px solid var(--accent)' : 'none' }}>
-            <div className="type-emoji">🌍</div>
-            <h3>ONLINE RESULT DEBATE</h3>
-            <p className="muted">Let a verifiable result decide.</p>
-            <p className="dim" style={{ fontSize: '0.85rem' }}>Use this when an agreed external result can settle the debate.</p>
-            <div className="explain" style={{ textAlign: 'left' }}>Example: You disagree about who will win a future match. Agree on the official result source and let it settle the debate.</div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 1: question + sides (§12, §21) */}
-      {step === 1 && (
-        <div className="card">
-          <h3>Write Your Debate</h3>
-          <Explain>State exactly what's being debated. Keep it clear so voters and the settlement source match it.</Explain>
-          <Field label="Debate question" hint={mode === 'online' ? 'e.g. Manchester United will beat Arsenal in the next match.' : 'e.g. Which presentation was better?'}>
-            <input className="input" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="What are you settling?" />
-          </Field>
-          <div className="grid grid-2">
-            <Field label={mode === 'online' ? 'Side A (YES)' : 'Side A'}>
-              <input className="input" value={sideA} onChange={(e) => setSideA(e.target.value)} placeholder={mode === 'online' ? 'YES' : 'Team Alpha'} />
-            </Field>
-            <Field label={mode === 'online' ? 'Side B (NO)' : 'Side B'}>
-              <input className="input" value={sideB} onChange={(e) => setSideB(e.target.value)} placeholder={mode === 'online' ? 'NO' : 'Team Beta'} />
-            </Field>
-          </div>
-          <Field label="Category">
-            <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">Select a category (optional)</option>
-              {categories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
-        </div>
-      )}
-
-      {/* Step 2: time (§14) */}
-      {step === 2 && (
-        <div className="card">
-          <h3>Set Time</h3>
-          <Explain>The debate only accepts votes between the agreed start and end times. The server clock is authoritative — never your device.</Explain>
-          <div className="grid grid-2">
-            <Field label="Starts">
-              <input className="input" type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
-            </Field>
-            <Field label="Ends">
-              <input className="input" type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
-            </Field>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: audience / settlement rule (§13, §15, §21) */}
-      {step === 3 && (
-        <div className="card">
-          <h3>{mode === 'local' ? 'Set Audience & Rules' : 'Set Settlement Rule'}</h3>
-          {mode === 'local' ? (
-            <>
-              <Explain>Both sides must agree on the number of voters before the debate can be locked. After agreement it can't be secretly changed.</Explain>
-              <Field label="Number of voters / judges">
-                <select className="select" value={requiredVoters} onChange={(e) => setRequiredVoters(Number(e.target.value))}>
-                  {[10, 20, 30, 50, 100].map((n) => <option key={n} value={n}>{n} voters</option>)}
-                  <option value={5}>5 (custom small)</option>
-                </select>
-              </Field>
-              <Field label="Vote count visibility">
-                <select className="select" value={votesPublic ? 'public' : 'hidden'} onChange={(e) => setVotesPublic(e.target.value === 'public')}>
-                  <option value="public">Public vote count</option>
-                  <option value="hidden">Hidden until debate closes</option>
-                </select>
-              </Field>
-              <label className="row" style={{ gap: 8, marginBottom: 12 }}>
-                <input type="checkbox" checked={allowDraw} onChange={(e) => setAllowDraw(e.target.checked)} />
-                <span>Allow a draw (tie)</span>
-              </label>
-              <div className="grid grid-2">
-                <Field label="Venue (optional)"><input className="input" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Bushenyi Community Hall" /></Field>
-                <Field label="City"><input className="input" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Bushenyi" /></Field>
-              </div>
-              <Field label="Country"><input className="input" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Uganda" /></Field>
-            </>
-          ) : (
-            <>
-              <Explain>The settlement source and rule must be agreed before locking. The system never randomly searches the internet after the debate ends.</Explain>
-              <Field label="Settlement source" hint="e.g. Official match result, official competition result, recognized public data.">
-                <input className="input" value={settlementSource} onChange={(e) => setSettlementSource(e.target.value)} placeholder="Official match result" />
-              </Field>
-              <Field label="Settlement rule" hint="Describe exactly how the result maps to a winner.">
-                <textarea className="textarea" value={settlementRule} onChange={(e) => setSettlementRule(e.target.value)} placeholder="YES wins if the official result records Manchester United as the winner." />
-              </Field>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Step 4: stake (§24, §25) */}
-      {step === 4 && (
-        <div className="card">
-          <h3>Set Stake</h3>
-          <Explain>{moneyMode ? 'Money stakes are not accepting commitments yet. You can review the debate setup, but the backend will not create a paid debate until the required checks are in place.' : 'Financial stakes are only enabled where legally permitted and configured. Set 0 for a free/social debate.'}</Explain>
-          <Field label="Stake per side (UGX)" hint="Each side locks this amount. Total pool = 2 × stake.">
-            <input className="input" type="number" min="0" step="100" value={stake} onChange={(e) => setStake(e.target.value)} />
-          </Field>
-          {stakeAmount > 0 && feePreview.data && (
-            <div className="card" style={{ background: 'var(--bg-elevated)' }}>
-              <div className="row-between"><span className="muted">Total pool</span><strong>{formatMoney(feePreview.data.total_pool, feePreview.data.currency)}</strong></div>
-              <div className="row-between"><span className="muted">Platform fee ({feePreview.data.platform_fee_percent}%)</span><strong>{formatMoney(feePreview.data.platform_fee_amount, feePreview.data.currency)}</strong></div>
-              <div className="row-between"><span className="muted">Estimated winner settlement</span><strong style={{ color: 'var(--success)' }}>{formatMoney(feePreview.data.estimated_winner_settlement, feePreview.data.currency)}</strong></div>
-            </div>
-          )}
-          {stakeAmount > 0 && feePreview.isLoading && <p className="help-text" role="status">Calculating fee and pool…</p>}
-          {stakeAmount > 0 && feePreview.isError && <p className="error-text" role="alert">Fee details are unavailable. Try again before continuing.</p>}
-        </div>
-      )}
-
-      {/* Step 5: visibility */}
-      {step === 5 && (
-        <div className="card">
-          <h3>Visibility</h3>
-          <Explain>Public debates appear in Discover, Trending, Categories and Search. Private debates are only accessible to invited users.</Explain>
-          <label className="row" style={{ gap: 8 }}>
-            <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-            <span>Make this debate public</span>
-          </label>
-        </div>
-      )}
-
-      {/* Step 6: review (§99) */}
-      {step === 6 && (
-        <div className="card">
-          <h3>Review</h3>
-          {moneyMode && <Explain>Money mode is selected, but paid debates are currently locked until verified-age records and live payment checks are implemented. You can review the rules here; creating this paid debate is disabled.</Explain>}
-          <Explain>Before you commit, make sure these four answers are clear.</Explain>
-          <table className="table">
-            <tbody>
-              <tr><td className="muted">What's being debated?</td><td><strong>{question}</strong></td></tr>
-              <tr><td className="muted">Who decides?</td><td>{mode === 'local' ? `${requiredVoters} invited voters` : `Settlement source: ${settlementSource}`}</td></tr>
-              <tr><td className="muted">When does it end?</td><td>{endAt ? new Date(endAt).toLocaleString() : '—'}</td></tr>
-              <tr><td className="muted">What happens to money?</td><td>{parseFloat(stake) > 0 ? `Each side locks UGX ${parseFloat(stake).toLocaleString()}; platform fee is calculated by the server.` : 'No financial stake — free debate.'}</td></tr>
-              <tr><td className="muted">Type</td><td>{mode === 'local' ? 'Local Debate' : 'Online Result Debate'}</td></tr>
-              <tr><td className="muted">Sides</td><td>{sideA} VS {sideB}</td></tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="row-between">
-        <button className="btn btn-secondary" onClick={back} disabled={step === 0}>← Back</button>
-        {step < STEP_COUNT - 1 ? (
-          <button className="btn btn-primary" onClick={() => validateStep() && next()}>Continue →</button>
-        ) : (
-            <button className="btn btn-primary" onClick={submit} disabled={createMutation.isPending || moneyMode}>
-            {createMutation.isPending ? 'Creating…' : moneyMode ? 'Money mode unavailable' : 'Create Debate'}
-          </button>
-        )}
-      </div>
->>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
     </div>
     <div className="card">
       <Field label="Debate topic"><input className="input" maxLength={500} value={question} onChange={e => setQuestion(e.target.value)} placeholder="Is AI going to replace most software developers?" /></Field>

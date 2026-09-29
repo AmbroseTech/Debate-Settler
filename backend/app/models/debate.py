@@ -119,14 +119,8 @@ class DebateParticipant(BaseModel):
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), index=True, nullable=True
     )
-<<<<<<< HEAD
     role: Mapped[ParticipantRole] = mapped_column(Enum(ParticipantRole), nullable=False)
     side: Mapped[Optional[Side]] = mapped_column(Enum(Side), nullable=True)
-=======
-    role: Mapped[ParticipantRole] = mapped_column(Enum(ParticipantRole, native_enum=False), nullable=False)
-    side: Mapped[Optional[Side]] = mapped_column(Enum(Side, native_enum=False), nullable=True)
-    has_funded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
->>>>>>> 0e93d668861d343013d6dc8b4026f728e4fb7e75
     confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     rules_agreed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

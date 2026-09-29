@@ -4,11 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminApi, friendlyError } from '../api/client'
 import { useAuth } from '../store/auth'
 import { EmptyState, Explain, Field, Spinner } from '../components/ui'
-import { formatDateTime, formatMoney } from '../utils/format'
+import { formatDateTime } from '../utils/format'
 
-interface Stats { users: number; debates: number; local_debates: number; online_debates: number; votes: number; deposits: string; withdrawals: string; platform_fees: string; open_disputes: number; currency: string }
+interface Stats { users: number; debates: number; local_debates: number; online_debates: number; votes: number; open_disputes: number }
 interface UserRow { id: string; username: string; email: string; role: string; status: string; email_verified: boolean; created_at: string }
-interface DisputeRow { id: string; debate_id: string; reason: string; status: string; payout_on_hold: boolean; created_at: string }
+interface DisputeRow { id: string; debate_id: string; reason: string; status: string; resolution_notes?: string | null; created_at: string }
 interface AuditRow { id: string; action: string; entity_type: string; entity_id: string; actor_id: string | null; created_at: string }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -70,9 +70,6 @@ export default function Admin() {
           <Stat label="Online" value={stats.data.online_debates} />
           <Stat label="Votes" value={stats.data.votes} />
           <Stat label="Open disputes" value={stats.data.open_disputes} />
-          <Stat label="Deposits" value={formatMoney(stats.data.deposits, stats.data.currency)} />
-          <Stat label="Withdrawals" value={formatMoney(stats.data.withdrawals, stats.data.currency)} />
-          <Stat label="Platform fees" value={formatMoney(stats.data.platform_fees, stats.data.currency)} />
         </div>
       ))}
 
@@ -105,7 +102,7 @@ export default function Admin() {
                 <span className={`badge ${d.status === 'open' ? 'badge-disputed' : 'badge-review'}`}>{d.status}</span>
               </div>
               <div className="dim" style={{ fontSize: '0.8rem', marginTop: 4 }}>
-                Payout {d.payout_on_hold ? 'on hold' : 'released'} · {formatDateTime(d.created_at)}
+                {d.resolution_notes ? `Resolution: ${d.resolution_notes.slice(0, 80)} · ` : ''}Raised {formatDateTime(d.created_at)}
               </div>
             </div>
           ))}

@@ -1,12 +1,14 @@
-// Debate detail: live voting, invitations, funding, locking, disputes (§16-§23).
+// Debate detail: rule agreement, locking, invitations, live voting, disputes (§16-§23).
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { debatesApi, disputesApi, friendlyError } from '../api/client'
 import { useAuth } from '../store/auth'
 import StatusBadge from '../components/StatusBadge'
+import Comments from '../components/Comments'
+import MediaUpload from '../components/MediaUpload'
 import { Explain, Field, Modal, Spinner } from '../components/ui'
-import { formatDateTime, formatMoney } from '../utils/format'
+import { formatDateTime } from '../utils/format'
 import type { VoteChoice } from '../types'
 
 export default function DebateDetail() {
@@ -34,8 +36,7 @@ export default function DebateDetail() {
     onSuccess: (res) => { setInfo(res.message); refresh(); },
     onError: (err) => setError(friendlyError(err)),
   })
-  const fundMut = useMutation({ mutationFn: () => debatesApi.fund(id!), onSuccess: () => { setInfo('Stake locked.'); refresh() }, onError: (e) => setError(friendlyError(e)) })
-  const lockMut = useMutation({ mutationFn: () => debatesApi.lock(id!), onSuccess: () => { setInfo('Debate locked.'); refresh() }, onError: (e) => setError(friendlyError(e)) })
+  const lockMut = useMutation({ mutationFn: () => debatesApi.lock(id!), onSuccess: () => { setInfo('Debate locked — now invite your voters.'); refresh() }, onError: (e) => setError(friendlyError(e)) })
   const confirmMut = useMutation({ mutationFn: (side: 'a' | 'b') => debatesApi.confirm(id!, side), onSuccess: () => { setInfo('Side confirmed.'); refresh() }, onError: (e) => setError(friendlyError(e)) })
   const inviteMut = useMutation({
     mutationFn: (kind: string) => debatesApi.createInvitation(id!, { kind, max_uses: kind === 'voter' ? 1000 : 1, expires_in_hours: 72 }),
@@ -44,7 +45,7 @@ export default function DebateDetail() {
   })
   const disputeMut = useMutation({
     mutationFn: (body: Record<string, unknown>) => disputesApi.create(body),
-    onSuccess: () => { setDisputeOpen(false); setInfo('Dispute submitted. Payout is on hold until review.') },
+    onSuccess: () => { setDisputeOpen(false); setInfo('Dispute submitted. A moderator will review it.') },
     onError: (e) => setError(friendlyError(e)),
   })
 
@@ -52,7 +53,6 @@ export default function DebateDetail() {
   if (!debate) return <div className="card">Debate not found.</div>
 
   const isLocal = debate.mode === 'local'
-  const hasStake = parseFloat(debate.stake_amount) > 0
   const isParticipant = debate.my_role === 'creator' || debate.my_role === 'challenger'
   const canVote = isLocal && debate.my_role === 'voter' && ['active', 'voting', 'closing_soon'].includes(debate.status)
   const votingOpen = isLocal && ['active', 'voting', 'closing_soon'].includes(debate.status)
@@ -101,7 +101,6 @@ export default function DebateDetail() {
 
         <div className="debate-meta">
           <span>⏱️ {isLocal ? 'Ends' : 'Event'}: {formatDateTime(debate.end_at)}</span>
-          {hasStake && <span>💰 {formatMoney(debate.stake_amount, debate.currency)} each</span>}
           <span>👥 {debate.participants_count} participants</span>
           <span>👁️ {debate.views} views</span>
         </div>
@@ -111,7 +110,7 @@ export default function DebateDetail() {
           <div className="row-between"><span className="muted">What's debated?</span><span>{debate.question}</span></div>
           <div className="row-between"><span className="muted">Who decides?</span><span>{isLocal ? `${debate.required_voters} invited voters` : debate.settlement_source}</span></div>
           <div className="row-between"><span className="muted">When does it end?</span><span>{formatDateTime(debate.end_at)}</span></div>
-          <div className="row-between"><span className="muted">Money?</span><span>{hasStake ? `${formatMoney(debate.stake_amount, debate.currency)} locked per side; winner gets pool minus ${debate.platform_fee_percent}% fee.` : 'No stake — free debate.'}</span></div>
+          <div className="row-between"><span className="muted">How is it decided?</span><span>{isLocal ? 'By the agreed number of community votes — no money, ever.' : `By the agreed source: ${debate.settlement_source}`}</span></div>
         </div>
       </div>
 
@@ -168,12 +167,11 @@ export default function DebateDetail() {
       {/* Participant actions */}
       {isParticipant && !debate.locked_at && (
         <div className="card">
-          <h3>Confirm & Fund</h3>
-          <Explain>Both sides must confirm the rules. If there's a stake, both sides must fund before the debate can be locked.</Explain>
+          <h3>Agree &amp; Lock</h3>
+          <Explain>Both sides must confirm they agree to the rules before the debate can be locked. Once locked, the rules and timing can’t change and you can invite voters.</Explain>
           <div className="row" style={{ flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary" onClick={() => confirmMut.mutate('a')} disabled={confirmMut.isPending}>Confirm as Side A</button>
-            <button className="btn btn-secondary" onClick={() => confirmMut.mutate('b')} disabled={confirmMut.isPending}>Confirm as Side B</button>
-            {hasStake && <button className="btn btn-primary" onClick={() => fundMut.mutate()} disabled={fundMut.isPending}>Fund my stake ({formatMoney(debate.stake_amount, debate.currency)})</button>}
+            <button className="btn btn-secondary" onClick={() => confirmMut.mutate('a')} disabled={confirmMut.isPending}>Agree — I’m Side A</button>
+            <button className="btn btn-secondary" onClick={() => confirmMut.mutate('b')} disabled={confirmMut.isPending}>Agree — I’m Side B</button>
             <button className="btn btn-primary" onClick={() => lockMut.mutate()} disabled={lockMut.isPending}>🔒 Lock Debate</button>
           </div>
         </div>
@@ -201,11 +199,17 @@ export default function DebateDetail() {
         )}
       </div>
 
+      {/* Media (§13) — signed-in participants can attach proof / visuals */}
+      {user && <MediaUpload debateId={id!} />}
+
+      {/* Discussion (§42) — separate from voting */}
+      <Comments debateId={id!} />
+
       {/* Dispute (§23) */}
       {['settled', 'draw', 'being_verified', 'closed'].includes(debate.status) && (
         <div className="card">
           <h3>Dispute Result</h3>
-          <Explain>Disagree with the result? Submit a dispute with evidence. Payouts go ON HOLD until review is complete.</Explain>
+          <Explain>Disagree with the result? Submit a dispute with evidence. A moderator reviews it before the result stands.</Explain>
           <button className="btn btn-danger" onClick={() => setDisputeOpen(true)}>Dispute Result</button>
         </div>
       )}

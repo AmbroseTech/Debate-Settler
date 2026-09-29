@@ -9,10 +9,10 @@ type Mode = 'signin' | 'register' | 'forgot' | 'reset'
 
 const TERMS = [
   'You must follow the platform rules and treat other users with respect.',
-  'Some debates may involve real financial stakes where legally permitted.',
-  'The platform fee is clearly displayed before any financial commitment.',
+  'Debate Settler is completely free — there are no wallets, stakes, fees or payments.',
   'Results and settlements follow the agreed debate rules and settlement source.',
-  'You must be eligible to use financial/gaming features in your jurisdiction.',
+  'You must be eligible to use the platform in your jurisdiction.',
+  'No AI decides a winner unless the locked debate rules explicitly allow it.',
 ]
 
 export default function AuthPage() {
@@ -219,10 +219,6 @@ export default function AuthPage() {
         <ol style={{ paddingLeft: 20, lineHeight: 1.7, fontSize: '0.9rem' }}>
           {TERMS.map((t) => <li key={t}>{t}</li>)}
         </ol>
-        <div className="card" style={{ background: 'var(--bg-elevated)', marginTop: 12 }}>
-          <strong>Platform settlement fee: 5%</strong>
-          <div className="help-text">Configurable between 5–10% by business/legal settings. The fee is always shown before you commit.</div>
-        </div>
         <label className="row mt-2" style={{ gap: 8 }}>
           <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} />
           <span style={{ fontSize: '0.9rem' }}>I agree to the Terms and Conditions</span>
