@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { authApi, usersApi, friendlyError } from '../api/client'
 import { useAuth } from '../store/auth'
 import { applyTheme, type ThemePref } from '../utils/theme'
-import { Explain, Field, Spinner } from '../components/ui'
+import { Explain, Field, Spinner, PasswordInput } from '../components/ui'
 
 interface Prefs {
   notify_in_app: boolean; notify_email: boolean; notify_push: boolean; notify_sms: boolean
@@ -125,15 +125,15 @@ export default function Settings() {
         <h2 style={{ fontSize: '1.1rem' }}>Change password</h2>
         <Explain>Choose a strong password you don't use elsewhere. You'll be signed out after changing it.</Explain>
         <Field label="Current password">
-          <input className="input" type="password" value={pw.current_password} autoComplete="current-password"
+          <PasswordInput value={pw.current_password} autoComplete="current-password"
             onChange={(e) => setPw({ ...pw, current_password: e.target.value })} />
         </Field>
         <Field label="New password" hint="At least 8 characters.">
-          <input className="input" type="password" value={pw.new_password} autoComplete="new-password"
+          <PasswordInput value={pw.new_password} autoComplete="new-password"
             onChange={(e) => setPw({ ...pw, new_password: e.target.value })} />
         </Field>
         <Field label="Confirm new password" error={pw.confirm && pw.confirm !== pw.new_password ? 'Passwords do not match.' : undefined}>
-          <input className="input" type="password" value={pw.confirm} autoComplete="new-password"
+          <PasswordInput value={pw.confirm} autoComplete="new-password"
             onChange={(e) => setPw({ ...pw, confirm: e.target.value })} />
         </Field>
         {pwMsg && <div className={pwMsg.ok ? 'help-text' : 'error-text'} role="status">{pwMsg.text}</div>}

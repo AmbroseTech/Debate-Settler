@@ -46,7 +46,8 @@ export function friendlyError(err: unknown, fallback = 'Something went wrong. Pl
 
 import type {
   Category, DebateBrief, DebateDetail, Notification, Paginated,
-  TokenResponse, User, VoteChoice,
+  TokenResponse, User, VoteChoice, VotersPage,
+  MatchState, MoveResult, GameInvitation, GamePreview, Leaderboard,
 } from '../types'
 
 export const authApi = {
@@ -73,6 +74,8 @@ export const debatesApi = {
   create: (body: Record<string, unknown>) => api.post<DebateDetail>('/debates', body).then(r => r.data),
   vote: (id: string, choice: VoteChoice) =>
     api.post(`/debates/${id}/vote`, { choice }).then(r => r.data),
+  voters: (id: string, page = 1, page_size = 20) =>
+    api.get<VotersPage>(`/debates/${id}/voters`, { params: { page, page_size } }).then(r => r.data),
   confirm: (id: string, side: 'a' | 'b') => api.post(`/debates/${id}/confirm`, { side }).then(r => r.data),
   lock: (id: string) => api.post(`/debates/${id}/lock`).then(r => r.data),
   createInvitation: (id: string, body: Record<string, unknown>) =>
@@ -133,6 +136,19 @@ export const gamesApi = {
   types: () => api.get<string[]>('/games/types').then(r => r.data),
   create: (game_type: string) => api.post('/games', { game_type }).then(r => r.data),
   list: () => api.get('/games').then(r => r.data),
+  leaderboard: (game_type: string, period: 'all_time' | 'weekly' | 'monthly' = 'all_time') =>
+    api.get<Leaderboard>('/games/leaderboard', { params: { game_type, period } }).then(r => r.data),
+  challenge: (game_type: string, to_username?: string) =>
+    api.post<GameInvitation>('/games/challenge', { game_type, to_username: to_username || null }).then(r => r.data),
+  previewInvitation: (token: string) =>
+    api.get<GamePreview>(`/games/invitations/${token}`).then(r => r.data),
+  acceptInvitation: (token: string) =>
+    api.post<MatchState>('/games/invitations/accept', null, { params: { token } }).then(r => r.data),
+  declineInvitation: (token: string) =>
+    api.post('/games/invitations/decline', null, { params: { token } }).then(r => r.data),
+  getMatch: (gameId: string) => api.get<MatchState>(`/games/${gameId}`).then(r => r.data),
+  move: (gameId: string, cell: number) =>
+    api.post<MoveResult>(`/games/${gameId}/move`, { cell }).then(r => r.data),
 }
 
 export const mediaApi = {

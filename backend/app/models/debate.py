@@ -17,6 +17,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy import Uuid as UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -130,6 +131,9 @@ class DebateParticipant(BaseModel):
 
 class DebateVote(BaseModel):
     __tablename__ = "debate_votes"
+    __table_args__ = (
+        UniqueConstraint("debate_id", "voter_id", name="uq_vote_debate_voter"),
+    )
 
     debate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("debates.id", ondelete="CASCADE"), index=True

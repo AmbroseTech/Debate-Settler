@@ -4,12 +4,12 @@ from __future__ import annotations
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_role
+from app.core.dependencies import get_current_user, get_optional_user, require_role
 from app.core.exceptions import NotFoundError
 from app.models.base import DisputeStatus, GameStatus, GameType, NotificationChannel, UserRole
 from app.models.category import Category
@@ -19,14 +19,21 @@ from app.models.user import User
 from app.schemas.common import Message
 from app.schemas.misc import (
     CategoryOut,
+    ChallengeRequest,
     DisputeCreate,
     DisputeOut,
     DisputeResolve,
     GameCreate,
+    GameInvitationOut,
     GameOut,
+    GamePreviewOut,
+    LeaderboardOut,
+    MatchStateOut,
+    MoveRequest,
+    MoveResultOut,
     NotificationOut,
 )
-from app.services import notification_service
+from app.services import game_service, notification_service, ranking_service
 from app.services.audit_service import record_audit
 
 categories_router = APIRouter(prefix="/categories", tags=["categories"])
@@ -133,12 +140,11 @@ async def resolve_dispute(
     return DisputeOut.model_validate(dispute)
 
 
-# --- Games (§51) — free play by default ---
+# --- Games (§51, §6, §7, §8) — free play by default ---
 
 @games_router.post("", response_model=GameOut, status_code=201)
 async def create_game(payload: GameCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    game = Game(game_type=payload.game_type, status=GameStatus.waiting, player_one_id=user.id)
-    db.add(game)
+    game = await game_service.create_match(db, user, payload.game_type)
     await db.commit()
     await db.refresh(game)
     return GameOut.model_validate(game)
@@ -157,3 +163,74 @@ async def list_games(user: User = Depends(get_current_user), db: AsyncSession = 
 @games_router.get("/types", response_model=List[str])
 async def game_types():
     return [g.value for g in GameType]
+
+
+@games_router.get("/leaderboard", response_model=LeaderboardOut)
+async def game_leaderboard(
+    game_type: GameType = Query(GameType.tic_tac_toe),
+    period: str = Query("all_time", pattern="^(all_time|weekly|monthly)$"),
+    db: AsyncSession = Depends(get_db),
+):
+    entries = await ranking_service.leaderboard(db, game_type, period=period)
+    return LeaderboardOut(game_type=game_type, period=period, entries=entries)
+
+
+@games_router.post("/challenge", response_model=GameInvitationOut, status_code=201)
+async def challenge_player(
+    payload: ChallengeRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    game = await game_service.create_match(db, user, payload.game_type)
+    invitation = await game_service.create_invitation(db, game, user, payload.to_username)
+    await db.commit()
+    url = await game_service.invite_url(invitation.token)
+    return GameInvitationOut(
+        token=invitation.token, game_id=game.id, game_type=game.game_type,
+        status=invitation.status, to_username=invitation.to_username,
+        expires_at=invitation.expires_at, invite_url=url,
+    )
+
+
+@games_router.get("/invitations/{token}", response_model=GamePreviewOut)
+async def game_invitation_preview(token: str, db: AsyncSession = Depends(get_db)):
+    data = await game_service.preview_invitation(db, token)
+    return GamePreviewOut(**data)
+
+
+@games_router.post("/invitations/accept", response_model=MatchStateOut)
+async def game_invitation_accept(
+    token: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    game = await game_service.accept_invitation(db, token, user)
+    view = await game_service.match_view(db, game, user)
+    await db.commit()
+    return MatchStateOut(**view)
+
+
+@games_router.post("/invitations/decline", response_model=Message)
+async def game_invitation_decline(
+    token: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    await game_service.decline_invitation(db, token, user)
+    await db.commit()
+    return Message(message="Challenge declined.")
+
+
+@games_router.get("/{game_id}", response_model=MatchStateOut)
+async def get_match(
+    game_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    game = await game_service.get_match(db, game_id, user)
+    view = await game_service.match_view(db, game, user)
+    return MatchStateOut(**view)
+
+
+@games_router.post("/{game_id}/move", response_model=MoveResultOut)
+async def make_move(
+    game_id: uuid.UUID, payload: MoveRequest,
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    game = await game_service.get_match(db, game_id, user)
+    game, message = await game_service.make_move(db, game, user, payload.cell)
+    view = await game_service.match_view(db, game, user)
+    await db.commit()
+    return MoveResultOut(message=message, match=MatchStateOut(**view))

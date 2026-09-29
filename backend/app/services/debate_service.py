@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +28,7 @@ from app.models.base import (
     DebateStatus,
     ParticipantRole,
     Side,
+    UserRole,
     VoteChoice,
 )
 from app.models.category import Category
@@ -38,7 +40,7 @@ from app.models.debate import (
     DebateRules,
     DebateVote,
 )
-from app.models.user import User
+from app.models.user import User, Profile
 from app.schemas.debate import DebateCreate
 from app.services import notification_service
 from app.services.audit_service import record_audit
@@ -47,6 +49,13 @@ from app.settlements import engine
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+    """Coerce DB datetimes to UTC-aware; SQLite round-trips them naive."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
 
 async def _add_event(
@@ -122,6 +131,82 @@ async def get_debate(db: AsyncSession, debate_id: uuid.UUID) -> Debate:
     return debate
 
 
+def is_staff(user: Optional[User]) -> bool:
+    return bool(user) and user.role in (UserRole.admin, UserRole.moderator)
+
+
+def is_debate_member(debate: Debate, user: Optional[User]) -> bool:
+    if user is None:
+        return False
+    if user.id == debate.creator_id:
+        return True
+    return any(p.user_id == user.id for p in debate.participants)
+
+
+def is_debate_side(debate: Debate, user: Optional[User]) -> bool:
+    if user is None:
+        return False
+    if user.id == debate.creator_id:
+        return True
+    return any(
+        p.user_id == user.id and p.role in (ParticipantRole.creator, ParticipantRole.challenger)
+        for p in debate.participants
+    )
+
+
+def can_view(debate: Debate, user: Optional[User]) -> bool:
+    """Backend-authoritative privacy (§4.2): a private debate is visible only to
+    its creator, its participants and staff. Public debates are visible to all."""
+    if debate.is_public or is_staff(user) or is_debate_member(debate, user):
+        return True
+    return False
+
+
+async def assert_can_view(debate: Debate, user: Optional[User]) -> None:
+    # 404 rather than 403 so a private debate's very existence is not leaked.
+    if not can_view(debate, user):
+        raise NotFoundError("Debate not found.")
+
+
+async def list_voters(
+    db: AsyncSession, debate: Debate, viewer: Optional[User],
+    *, limit: int = 50, offset: int = 0,
+) -> dict:
+    """People who voted (§5): identities only, never the side chosen. Individual
+    vote choices are never read or serialized here."""
+    valid_ids = (
+        await db.execute(
+            select(DebateVote.voter_id)
+            .where(DebateVote.debate_id == debate.id, DebateVote.is_valid.is_(True))
+        )
+    ).scalars().all()
+    total = len(valid_ids)
+
+    rules = debate.rules
+    votes_public = rules.votes_public if rules else True
+    reveal = votes_public or is_debate_side(debate, viewer) or is_staff(viewer)
+
+    if not reveal:
+        # Preserve anonymity: expose the count but not who took part (§5.1).
+        masked = [{"username": f"Community member", "display_name": None, "avatar_url": None}
+                  for _ in valid_ids[offset: offset + limit]]
+        return {"total": total, "voters": masked, "identities_public": False}
+
+    rows = (
+        await db.execute(
+            select(User.username, Profile.display_name, Profile.avatar_url)
+            .join(Profile, Profile.user_id == User.id)
+            .where(User.id.in_(valid_ids))
+            .order_by(User.username.asc())
+            .limit(limit).offset(offset)
+        )
+    ).all()
+    voters = [
+        {"username": u, "display_name": dn, "avatar_url": av} for (u, dn, av) in rows
+    ]
+    return {"total": total, "voters": voters, "identities_public": True}
+
+
 async def create_invitation(
     db: AsyncSession, debate: Debate, kind: str, max_uses: int,
     expires_in_hours: int, invited_email: Optional[str] = None,
@@ -168,7 +253,7 @@ async def accept_invitation(db: AsyncSession, token: str, user: User) -> DebateI
     invitation = result.scalar_one_or_none()
     if invitation is None:
         raise NotFoundError("This invitation link is not valid.")
-    if invitation.response == "declined" or invitation.used or (invitation.expires_at and invitation.expires_at < _now()):
+    if invitation.response == "declined" or invitation.used or (_aware(invitation.expires_at) and _aware(invitation.expires_at) < _now()):
         raise ConflictError("This invitation has expired or already been used.")
     if invitation.use_count >= invitation.max_uses:
         raise ConflictError("This invitation has reached its usage limit.")
@@ -189,7 +274,7 @@ async def accept_invitation(db: AsyncSession, token: str, user: User) -> DebateI
     await notification_service.notify(
         db, debate.creator_id, "Your debate invitation was accepted",
         f"{user.username} accepted your invitation to “{debate.question}”.",
-        category="debate",
+        category="debate", link=f"/debates/{debate.id}",
     )
     await db.flush()
     return invitation
@@ -299,9 +384,9 @@ async def cast_vote(db: AsyncSession, debate: Debate, user: User, choice: VoteCh
     if debate.mode != DebateMode.local:
         raise ConflictError("Only local debates use audience voting.")
     now = _now()
-    if debate.start_at and now < debate.start_at:
+    if debate.start_at and now < _aware(debate.start_at):
         raise ConflictError("Voting hasn't started yet.")
-    if debate.end_at and now > debate.end_at:
+    if debate.end_at and now > _aware(debate.end_at):
         raise ConflictError("Voting has closed.")
     if debate.status not in (DebateStatus.active, DebateStatus.voting, DebateStatus.closing_soon):
         raise ConflictError("This debate isn't accepting votes right now.")
@@ -337,7 +422,12 @@ async def cast_vote(db: AsyncSession, debate: Debate, user: User, choice: VoteCh
         await db.flush()
         return True, "Your vote has been updated."
 
-    db.add(DebateVote(debate_id=debate.id, voter_id=user.id, choice=choice, is_valid=True))
+    try:
+        async with db.begin_nested():
+            db.add(DebateVote(debate_id=debate.id, voter_id=user.id, choice=choice, is_valid=True))
+            await db.flush()
+    except IntegrityError:
+        raise ConflictError("You've already voted in this debate.")
     await _add_event(db, debate.id, "vote_cast", actor_id=user.id)
     await record_audit(db, "vote_submission", actor_id=user.id, entity_type="debate", entity_id=str(debate.id))
     await db.flush()
@@ -354,10 +444,21 @@ async def vote_counts(db: AsyncSession, debate: Debate, reveal: bool) -> dict:
     revealed = reveal or votes_public or debate.status in (
         DebateStatus.closed, DebateStatus.settled, DebateStatus.draw,
     )
+    side_a = tally["side_a"] if revealed else 0
+    side_b = tally["side_b"] if revealed else 0
+    draw = tally["draw"] if revealed else 0
+    denom = side_a + side_b + draw
+
+    def _pct(n: int) -> float:
+        return round(n * 100 / denom, 1) if denom else 0.0
+
     return {
-        "side_a": tally["side_a"] if revealed else 0,
-        "side_b": tally["side_b"] if revealed else 0,
-        "draw": tally["draw"] if revealed else 0,
+        "side_a": side_a,
+        "side_b": side_b,
+        "draw": draw,
+        "side_a_pct": _pct(side_a),
+        "side_b_pct": _pct(side_b),
+        "draw_pct": _pct(draw),
         "total": tally["total"],
         "required": required,
         "revealed": revealed,
@@ -406,7 +507,7 @@ async def trending_debates(db: AsyncSession, limit: int = 10) -> List[Debate]:
 
     def score(d: Debate) -> float:
         freshness = 1.0
-        age_days = (_now() - d.created_at).days if d.created_at else 0
+        age_days = (_now() - _aware(d.created_at)).days if d.created_at else 0
         if age_days <= 7:
             freshness = 1.5
         elif age_days > 30:

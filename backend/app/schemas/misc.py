@@ -94,6 +94,73 @@ class GameMoveRequest(BaseModel):
     move: dict
 
 
+class ChallengeRequest(BaseModel):
+    game_type: GameType
+    to_username: Optional[str] = Field(None, max_length=50)
+
+
+class GameInvitationOut(BaseModel):
+    token: str
+    game_id: uuid.UUID
+    game_type: GameType
+    status: str
+    to_username: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    invite_url: str
+
+
+class GamePreviewOut(BaseModel):
+    game_id: str
+    game_type: str
+    status: str
+    invitation_status: str
+    expired: bool
+    inviter_username: str
+    to_username: Optional[str] = None
+
+
+class MoveRequest(BaseModel):
+    cell: int = Field(..., ge=0, le=8)
+
+
+class MatchStateOut(BaseModel):
+    id: uuid.UUID
+    game_type: GameType
+    status: GameStatus
+    player_one_id: Optional[uuid.UUID] = None
+    player_two_id: Optional[uuid.UUID] = None
+    current_turn: Optional[uuid.UUID] = None
+    winner_id: Optional[uuid.UUID] = None
+    board: List[Optional[str]] = []
+    your_mark: Optional[str] = None
+    can_play: bool = False
+
+
+class MoveResultOut(BaseModel):
+    message: str
+    match: MatchStateOut
+
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    username: str
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    matches: int
+    wins: int
+    losses: int
+    draws: int
+    win_pct: float
+    current_streak: int
+    rating: Optional[int] = None
+
+
+class LeaderboardOut(BaseModel):
+    game_type: GameType
+    period: str
+    entries: List[LeaderboardEntry] = []
+
+
 # --- Admin ---
 
 class AdminStats(BaseModel):

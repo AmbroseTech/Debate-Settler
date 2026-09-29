@@ -104,9 +104,25 @@ class VoteCounts(BaseModel):
     side_a: int = 0
     side_b: int = 0
     draw: int = 0
+    side_a_pct: float = 0.0
+    side_b_pct: float = 0.0
+    draw_pct: float = 0.0
     total: int = 0
     required: int = 0
     revealed: bool = False
+
+
+class VoterOut(BaseModel):
+    # Participation only — never the side a voter chose (§5.1).
+    username: str
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class VotersPage(BaseModel):
+    total: int
+    voters: List[VoterOut] = []
+    identities_public: bool = True
 
 
 class CastVoteRequest(BaseModel):

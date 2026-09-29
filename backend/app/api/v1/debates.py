@@ -37,6 +37,7 @@ from app.schemas.debate import (
     LockDebateResponse,
     ShareLinks,
     VoteCounts,
+    VotersPage,
 )
 from app.services import debate_service
 
@@ -201,6 +202,7 @@ async def get_debate(
     db: AsyncSession = Depends(get_db),
 ):
     debate = await debate_service.get_debate(db, debate_id)
+    await debate_service.assert_can_view(debate, user)
     debate.views += 1
     await db.commit()
     return await _to_detail(db, debate, user)
@@ -213,12 +215,30 @@ async def get_votes(
     db: AsyncSession = Depends(get_db),
 ):
     debate = await debate_service.get_debate(db, debate_id)
+    await debate_service.assert_can_view(debate, user)
     reveal = False
     if user:
         p = next((x for x in debate.participants if x.user_id == user.id and x.role != ParticipantRole.voter), None)
         reveal = p is not None
     counts = await debate_service.vote_counts(db, debate, reveal=reveal)
     return VoteCounts(**counts)
+
+
+@router.get("/{debate_id}/voters", response_model=VotersPage)
+async def get_voters(
+    debate_id: uuid.UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """People who voted (§5): participation only, never the chosen side."""
+    debate = await debate_service.get_debate(db, debate_id)
+    await debate_service.assert_can_view(debate, user)
+    data = await debate_service.list_voters(
+        db, debate, user, limit=page_size, offset=(page - 1) * page_size
+    )
+    return VotersPage(**data)
 
 
 @router.post("/{debate_id}/vote", response_model=CastVoteResponse)
@@ -229,6 +249,7 @@ async def cast_vote(
     db: AsyncSession = Depends(get_db),
 ):
     debate = await debate_service.get_debate(db, debate_id)
+    await debate_service.assert_can_view(debate, user)
     recorded, message = await debate_service.cast_vote(db, debate, user, payload.choice)
     counts = await debate_service.vote_counts(db, debate, reveal=False)
     await db.commit()
@@ -236,8 +257,9 @@ async def cast_vote(
 
 
 @router.get("/{debate_id}/comments")
-async def list_comments(debate_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def list_comments(debate_id: uuid.UUID, user: Optional[User] = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
     debate = await debate_service.get_debate(db, debate_id)
+    await debate_service.assert_can_view(debate, user)
     rows = (await db.execute(select(DebateComment).where(
         DebateComment.debate_id == debate_id, DebateComment.hidden.is_(False)
     ).order_by(DebateComment.pinned.desc(), DebateComment.created_at.asc()).limit(300))).scalars().all()
@@ -257,8 +279,7 @@ async def list_comments(debate_id: uuid.UUID, db: AsyncSession = Depends(get_db)
 async def create_comment(debate_id: uuid.UUID, payload: CommentCreate,
                          user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     debate = await debate_service.get_debate(db, debate_id)
-    if not debate.is_public and user.id != debate.creator_id and not any(p.user_id == user.id for p in debate.participants):
-        raise NotFoundError("Debate not found.")
+    await debate_service.assert_can_view(debate, user)
     recent = (await db.execute(select(DebateComment).where(
         DebateComment.user_id == user.id, DebateComment.debate_id == debate_id
     ).order_by(DebateComment.created_at.desc()).limit(1))).scalar_one_or_none()

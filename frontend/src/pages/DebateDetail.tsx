@@ -139,11 +139,14 @@ export default function DebateDetail() {
             <div className="mt-2">
               <div className="row-between"><span className="muted">Votes recorded</span><strong>{tally.total} / {tally.required || '∞'}</strong></div>
               {tally.revealed ? (
-                <div className="grid grid-3 mt-2">
-                  <div className="stat"><div className="stat-label">{debate.side_a_label}</div><div className="stat-value">{tally.side_a}</div></div>
-                  <div className="stat"><div className="stat-label">{debate.side_b_label}</div><div className="stat-value">{tally.side_b}</div></div>
-                  <div className="stat"><div className="stat-label">Draw</div><div className="stat-value">{tally.draw}</div></div>
-                </div>
+                <>
+                  <div className="vote-bars mt-2">
+                    <VoteBar label={debate.side_a_label} count={tally.side_a} pct={tally.side_a_pct} tone="a" />
+                    <VoteBar label={debate.side_b_label} count={tally.side_b} pct={tally.side_b_pct} tone="b" />
+                    {tally.draw > 0 && <VoteBar label="Draw" count={tally.draw} pct={tally.draw_pct} tone="draw" />}
+                  </div>
+                  <PeopleWhoVoted debateId={id!} total={tally.total} />
+                </>
               ) : (
                 <Explain>Current result: <strong>Hidden until debate closes</strong> (per the agreed rules).</Explain>
               )}
@@ -242,6 +245,56 @@ export default function DebateDetail() {
           <button className="btn btn-danger btn-block" disabled={disputeMut.isPending}>Submit Dispute</button>
         </form>
       </Modal>
+    </div>
+  )
+}
+
+function VoteBar({ label, count, pct, tone }: { label: string; count: number; pct: number; tone: 'a' | 'b' | 'draw' }) {
+  const width = `${Math.max(0, Math.min(100, pct || 0))}%`
+  return (
+    <div className="vote-bar-row">
+      <div className="row-between"><span className="muted">{label}</span><span><strong>{count}</strong> · {pct.toFixed(1)}%</span></div>
+      <div className="vote-bar-track"><div className={`vote-bar-fill vote-bar-${tone}`} style={{ width }} /></div>
+    </div>
+  )
+}
+
+// §5: the list proves participation only — the backend never returns chosen sides.
+function PeopleWhoVoted({ debateId, total }: { debateId: string; total: number }) {
+  const [open, setOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const pageSize = 20
+  const { data, isFetching } = useQuery({
+    queryKey: ['debate-voters', debateId, page],
+    queryFn: () => debatesApi.voters(debateId, page, pageSize),
+    enabled: open,
+  })
+
+  if (total <= 0) return null
+  const shown = data?.voters ?? []
+  return (
+    <div className="mt-2">
+      <button className="btn btn-ghost btn-sm" type="button" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+        {open ? '▾' : '▸'} People Who Voted — {total}
+      </button>
+      {open && (
+        <div className="voters-panel">
+          {isFetching && shown.length === 0 && <div className="dim" style={{ padding: 8 }}>Loading…</div>}
+          <ul className="voters-list">
+            {shown.map((v, i) => (
+              <li key={`${v.username}-${i}`} className="voter-row">
+                <span className="avatar-sm" aria-hidden>{(v.display_name || v.username || '?').slice(0, 1).toUpperCase()}</span>
+                <span>{v.display_name || v.username}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="row-between" style={{ marginTop: 8 }}>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1 || isFetching} onClick={() => setPage(p => p - 1)}>Prev</button>
+            <span className="dim" style={{ fontSize: '0.75rem' }}>{data?.identities_public ? 'Participation only — votes stay private.' : 'Names are hidden for this debate.'}</span>
+            <button className="btn btn-secondary btn-sm" disabled={shown.length < pageSize || isFetching} onClick={() => setPage(p => p + 1)}>Next</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

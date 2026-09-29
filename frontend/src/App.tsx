@@ -26,6 +26,8 @@ const Help = lazy(() => import('./pages/Help'))
 const Admin = lazy(() => import('./pages/Admin'))
 const JoinDebate = lazy(() => import('./pages/JoinDebate'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
+const GameMatch = lazy(() => import('./pages/GameMatch'))
+const GameJoin = lazy(() => import('./pages/GameJoin'))
 
 function Loading() {
   return <div className="center muted" style={{ padding: 40 }}>Loading…</div>
@@ -50,6 +52,7 @@ export default function App() {
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/join/:token" element={<JoinDebate />} />
+        <Route path="/games/join/:token" element={<GameJoin />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
@@ -62,6 +65,7 @@ export default function App() {
             <Route path="/my-debates" element={<MyDebates />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/games" element={<Games />} />
+            <Route path="/games/:id" element={<GameMatch />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/about" element={<About />} />

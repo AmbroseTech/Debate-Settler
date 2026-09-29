@@ -114,6 +114,42 @@ p { margin: 0 0 1em; }
 .help-text { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
 .error-text { font-size: 0.8rem; color: var(--danger); margin-top: 4px; }
 
+/* --- Password visibility toggle (§2) --- */
+.pw-wrap { position: relative; }
+.pw-wrap .input { padding-right: 44px; }
+.pw-toggle {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0;
+  background: transparent; border: none; border-radius: 6px;
+  color: var(--text-muted); cursor: pointer;
+}
+.pw-toggle:hover { color: var(--text); }
+.pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Vote results (§3) and People Who Voted (§5) */
+.vote-bars { display: grid; gap: 12px; }
+.vote-bar-row { display: grid; gap: 5px; }
+.vote-bar-track { height: 10px; border-radius: 999px; background: var(--bg-elevated); border: 1px solid var(--border); overflow: hidden; }
+.vote-bar-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.vote-bar-a { background: var(--accent); }
+.vote-bar-b { background: #4f8cff; }
+.vote-bar-draw { background: var(--warning); }
+.voters-panel { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px; }
+.voters-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.voter-row { display: flex; align-items: center; gap: 10px; font-size: 0.875rem; }
+.avatar-sm { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(139,240,189,.14); color: var(--accent); font-weight: 700; font-size: 0.75rem; }
+
+/* Tic-tac-toe board (§6) */
+.ttt-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 300px; margin: 0 auto; }
+.ttt-cell { aspect-ratio: 1 / 1; font-size: 2rem; font-weight: 800; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--bg-elevated); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ttt-cell:disabled { cursor: not-allowed; opacity: 0.9; }
+.ttt-cell.ttt-x { color: var(--accent); }
+.ttt-cell.ttt-o { color: #4f8cff; }
+.board-row { display: flex; gap: 6px; }
+.rank-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.rank-num { width: 24px; text-align: right; color: var(--text-dim); font-weight: 700; }
+
 /* --- Cards --- */
 .card {
   background: linear-gradient(145deg, rgba(28,43,68,.97), rgba(18,29,48,.97)); border: 1px solid var(--border);

@@ -1,9 +1,9 @@
 // Auth page: Register / Sign In / Forgot / Reset, with Terms popup (§5, §6).
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { authApi, friendlyError } from '../api/client'
-import { Field, Modal } from '../components/ui'
+import { Field, Modal, PasswordInput } from '../components/ui'
 
 type Mode = 'signin' | 'register' | 'forgot' | 'reset'
 
@@ -23,6 +23,8 @@ export default function AuthPage() {
   const [pendingRegister, setPendingRegister] = useState<Record<string, unknown> | null>(null)
   const { login, register, loading } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const next = (location.state as { next?: string } | null)?.next
 
   // Register form state
   const [username, setUsername] = useState('')
@@ -68,7 +70,7 @@ export default function AuthPage() {
     setTermsOpen(false)
     try {
       await register(pendingRegister)
-      navigate('/welcome')
+      navigate(next ?? '/welcome')
     } catch (err) {
       setError(friendlyError(err))
     }
@@ -79,7 +81,7 @@ export default function AuthPage() {
     setError('')
     try {
       await login(identifier, signinPassword)
-      navigate('/')
+      navigate(next ?? '/')
     } catch (err) {
       setError(friendlyError(err, 'Incorrect username/email or password.'))
     }
@@ -148,7 +150,7 @@ export default function AuthPage() {
               <input className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete="username" />
             </Field>
             <Field label="Password">
-              <input className="input" type="password" value={signinPassword} onChange={(e) => setSigninPassword(e.target.value)} required autoComplete="current-password" />
+              <PasswordInput value={signinPassword} onChange={(e) => setSigninPassword(e.target.value)} required autoComplete="current-password" />
             </Field>
             <button className="btn btn-primary btn-block" disabled={loading}>{loading ? 'Signing in…' : 'Sign In'}</button>
             <div className="row-between mt-2" style={{ fontSize: '0.85rem' }}>
@@ -173,10 +175,10 @@ export default function AuthPage() {
               <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
             </Field>
             <Field label="Password" hint="At least 8 characters.">
-              <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
             </Field>
             <Field label="Confirm password">
-              <input className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
+              <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
             </Field>
             <label className="row" style={{ alignItems: 'flex-start', gap: 8, marginBottom: 16, fontSize: '0.85rem' }}>
               <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} style={{ marginTop: 3 }} />
@@ -205,7 +207,7 @@ export default function AuthPage() {
               <input className="input" value={resetToken} onChange={(e) => setResetToken(e.target.value)} required />
             </Field>
             <Field label="New password">
-              <input className="input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
+              <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
             </Field>
             <button className="btn btn-primary btn-block">Reset password</button>
           </form>

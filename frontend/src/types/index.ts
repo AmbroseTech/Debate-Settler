@@ -69,9 +69,24 @@ export interface VoteCounts {
   side_a: number
   side_b: number
   draw: number
+  side_a_pct: number
+  side_b_pct: number
+  draw_pct: number
   total: number
   required: number
   revealed: boolean
+}
+
+export interface Voter {
+  username: string
+  display_name?: string | null
+  avatar_url?: string | null
+}
+
+export interface VotersPage {
+  total: number
+  voters: Voter[]
+  identities_public: boolean
 }
 
 export interface DebateBrief {
@@ -137,4 +152,66 @@ export interface Paginated<T> {
 
 export interface ApiError {
   error: { code: string; message: string; context?: Record<string, unknown> | null }
+}
+
+// --- Games (§6, §7, §8) ---
+
+export type GameStatus = 'waiting' | 'active' | 'finished' | 'cancelled'
+
+export interface MatchState {
+  id: string
+  game_type: string
+  status: GameStatus
+  player_one_id?: string | null
+  player_two_id?: string | null
+  current_turn?: string | null
+  winner_id?: string | null
+  board: (string | null)[]
+  your_mark?: 'x' | 'o' | null
+  can_play: boolean
+}
+
+export interface MoveResult {
+  message: string
+  match: MatchState
+}
+
+export interface GameInvitation {
+  token: string
+  game_id: string
+  game_type: string
+  status: string
+  to_username?: string | null
+  expires_at?: string | null
+  invite_url: string
+}
+
+export interface GamePreview {
+  game_id: string
+  game_type: string
+  status: string
+  invitation_status: string
+  expired: boolean
+  inviter_username: string
+  to_username?: string | null
+}
+
+export interface LeaderboardEntry {
+  rank: number
+  username: string
+  display_name?: string | null
+  avatar_url?: string | null
+  matches: number
+  wins: number
+  losses: number
+  draws: number
+  win_pct: number
+  current_streak: number
+  rating?: number | null
+}
+
+export interface Leaderboard {
+  game_type: string
+  period: string
+  entries: LeaderboardEntry[]
 }
