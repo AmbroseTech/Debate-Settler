@@ -1,25 +1,27 @@
 """Auth and user schemas."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.base import UserRole, UserStatus
 
-
 # --- Auth ---
 
+
 class RegisterRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_.-]+$")
+    username: str = Field(
+        ..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_.-]+$"
+    )
     email: EmailStr
-    phone: Optional[str] = Field(None, max_length=30)
+    phone: str | None = Field(None, max_length=30)
     password: str = Field(..., min_length=8, max_length=128)
     confirm_password: str = Field(..., min_length=8, max_length=128)
     accept_terms: bool = Field(False)
-    country_code: Optional[str] = Field(None, max_length=2)
+    country_code: str | None = Field(None, max_length=2)
 
 
 class LoginRequest(BaseModel):
@@ -61,13 +63,14 @@ class UsernameCheckResponse(BaseModel):
 
 # --- User / Profile ---
 
+
 class ProfileOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
-    bio: Optional[str] = None
-    favorite_categories: Optional[str] = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
+    favorite_categories: str | None = None
     debates_created: int = 0
     debates_participated: int = 0
     wins: int = 0
@@ -84,9 +87,9 @@ class UserOut(BaseModel):
     role: UserRole
     status: UserStatus
     email_verified: bool
-    country_code: Optional[str] = None
+    country_code: str | None = None
     created_at: datetime
-    profile: Optional[ProfileOut] = None
+    profile: ProfileOut | None = None
 
 
 class UserPublic(BaseModel):
@@ -94,14 +97,14 @@ class UserPublic(BaseModel):
 
     id: uuid.UUID
     username: str
-    profile: Optional[ProfileOut] = None
+    profile: ProfileOut | None = None
 
 
 class UpdateProfileRequest(BaseModel):
-    display_name: Optional[str] = Field(None, max_length=100)
-    avatar_url: Optional[str] = Field(None, max_length=500)
-    bio: Optional[str] = Field(None, max_length=1000)
-    favorite_categories: Optional[List[str]] = None
+    display_name: str | None = Field(None, max_length=100)
+    avatar_url: str | None = Field(None, max_length=500)
+    bio: str | None = Field(None, max_length=1000)
+    favorite_categories: list[str] | None = None
 
 
 class ChangePasswordRequest(BaseModel):
@@ -123,11 +126,11 @@ class UserPreferencesOut(BaseModel):
 
 
 class UpdatePreferencesRequest(BaseModel):
-    notify_in_app: Optional[bool] = None
-    notify_email: Optional[bool] = None
-    notify_push: Optional[bool] = None
-    notify_sms: Optional[bool] = None
-    profile_public: Optional[bool] = None
-    allow_invitations: Optional[bool] = None
-    show_tutorial: Optional[bool] = None
-    theme: Optional[str] = None
+    notify_in_app: bool | None = None
+    notify_email: bool | None = None
+    notify_push: bool | None = None
+    notify_sms: bool | None = None
+    profile_public: bool | None = None
+    allow_invitations: bool | None = None
+    show_tutorial: bool | None = None
+    theme: str | None = None

@@ -2,9 +2,10 @@
 
 Consistent API responses across the app (§67).
 """
+
 from __future__ import annotations
 
-from typing import Any, Generic, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +19,7 @@ class Message(BaseModel):
 class ErrorDetail(BaseModel):
     code: str
     message: str
-    context: Optional[dict[str, Any]] = None
+    context: dict[str, Any] | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -31,13 +32,17 @@ class PaginationParams(BaseModel):
 
 
 class Paginated(BaseModel, Generic[T]):
-    items: List[T]
+    items: list[T]
     total: int
     page: int
     page_size: int
     pages: int
 
     @classmethod
-    def create(cls, items: List[T], total: int, page: int, page_size: int) -> "Paginated[T]":
+    def create(
+        cls, items: list[T], total: int, page: int, page_size: int
+    ) -> Paginated[T]:
         pages = (total + page_size - 1) // page_size if page_size else 0
-        return cls(items=items, total=total, page=page, page_size=page_size, pages=pages)
+        return cls(
+            items=items, total=total, page=page, page_size=page_size, pages=pages
+        )

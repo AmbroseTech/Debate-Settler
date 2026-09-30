@@ -8,21 +8,21 @@ Only games with an implemented rule engine are playable through invitations.
 Tic-tac-toe is fully server-authoritative; other listed types require a
 dedicated engine before they can be challenged.
 """
+
 from __future__ import annotations
 
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import (
+    AuthorizationError,
     ConflictError,
     NotFoundError,
-    AuthorizationError,
     ValidationError,
 )
 from app.core.security import generate_token_urlsafe
@@ -33,9 +33,14 @@ from app.services import notification_service, ranking_service
 
 PLAYABLE = {GameType.tic_tac_toe}
 _WIN_LINES = [
-    (0, 1, 2), (3, 4, 5), (6, 7, 8),
-    (0, 3, 6), (1, 4, 7), (2, 5, 8),
-    (0, 4, 8), (2, 4, 6),
+    (0, 1, 2),
+    (3, 4, 5),
+    (6, 7, 8),
+    (0, 3, 6),
+    (1, 4, 7),
+    (2, 5, 8),
+    (0, 4, 8),
+    (2, 4, 6),
 ]
 
 
@@ -43,7 +48,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+def _aware(dt: datetime | None) -> datetime | None:
     """Coerce DB datetimes to UTC-aware; SQLite round-trips them naive."""
     if dt is None:
         return None
@@ -57,15 +62,17 @@ def _require_playable(game_type: GameType) -> None:
         )
 
 
-def _initial_state(p1: uuid.UUID, p2: Optional[uuid.UUID]) -> str:
-    return json.dumps({
-        "board": [None] * 9,
-        "turn": "x",
-        "marks": {"x": str(p1), "o": str(p2) if p2 else None},
-    })
+def _initial_state(p1: uuid.UUID, p2: uuid.UUID | None) -> str:
+    return json.dumps(
+        {
+            "board": [None] * 9,
+            "turn": "x",
+            "marks": {"x": str(p1), "o": str(p2) if p2 else None},
+        }
+    )
 
 
-def _tic_tac_toe_winner(board: list) -> Optional[str]:
+def _tic_tac_toe_winner(board: list) -> str | None:
     for a, b, c in _WIN_LINES:
         if board[a] and board[a] == board[b] == board[c]:
             return board[a]
@@ -84,14 +91,17 @@ async def invite_url(token: str) -> str:
 
 
 async def create_invitation(
-    db: AsyncSession, game: Game, from_user: User, to_username: Optional[str] = None,
+    db: AsyncSession,
+    game: Game,
+    from_user: User,
+    to_username: str | None = None,
     expires_hours: int = 72,
 ) -> GameInvitation:
     _require_playable(game.game_type)
     if game.status != GameStatus.waiting:
         raise ConflictError("This match can no longer be invited to.")
 
-    target: Optional[User] = None
+    target: User | None = None
     if to_username:
         target = (
             await db.execute(select(User).where(User.username == to_username))
@@ -114,9 +124,12 @@ async def create_invitation(
 
     if target:
         await notification_service.notify(
-            db, target.id, "You've been challenged to a game",
+            db,
+            target.id,
+            "You've been challenged to a game",
             f"{from_user.username} challenged you to a match of {game.game_type.value}.",
-            category="game", link=f"/games/join/{invitation.token}",
+            category="game",
+            link=f"/games/join/{invitation.token}",
         )
     return invitation
 
@@ -134,7 +147,9 @@ async def preview_invitation(db: AsyncSession, token: str) -> dict:
     invitation = await _load_invitation(db, token)
     game = await db.get(Game, invitation.game_id)
     inviter = await db.get(User, invitation.from_user_id)
-    expired = bool(_aware(invitation.expires_at) and _aware(invitation.expires_at) <= _now())
+    expired = bool(
+        _aware(invitation.expires_at) and _aware(invitation.expires_at) <= _now()
+    )
     return {
         "game_id": str(game.id),
         "game_type": game.game_type.value,
@@ -182,15 +197,20 @@ async def accept_invitation(db: AsyncSession, token: str, user: User) -> Game:
     link = f"/games/{game.id}"
     for other in (game.player_one_id, user.id):
         await notification_service.notify(
-            db, other, "Your match is ready",
+            db,
+            other,
+            "Your match is ready",
             f"{user.username} accepted your {game.game_type.value} challenge. Make your move!",
-            category="game", link=link,
+            category="game",
+            link=link,
         )
     await db.flush()
     return game
 
 
-async def decline_invitation(db: AsyncSession, token: str, user: User) -> GameInvitation:
+async def decline_invitation(
+    db: AsyncSession, token: str, user: User
+) -> GameInvitation:
     invitation = await _load_invitation(db, token)
     if invitation.status != "pending":
         raise ConflictError("This challenge has already been answered.")
@@ -206,9 +226,12 @@ async def decline_invitation(db: AsyncSession, token: str, user: User) -> GameIn
     inviter = await db.get(User, invitation.from_user_id)
     if inviter:
         await notification_service.notify(
-            db, inviter.id, "Your challenge was declined",
+            db,
+            inviter.id,
+            "Your challenge was declined",
             f"{user.username} declined your {game.game_type.value if game else 'game'} challenge.",
-            category="game", link=f"/games",
+            category="game",
+            link="/games",
         )
     await db.flush()
     return invitation
@@ -219,15 +242,16 @@ async def get_match(db: AsyncSession, game_id: uuid.UUID, user: User) -> Game:
     if game is None:
         raise NotFoundError("Match not found.")
     if user.role not in (UserRole.admin, UserRole.moderator) and user.id not in (
-        game.player_one_id, game.player_two_id
+        game.player_one_id,
+        game.player_two_id,
     ):
         raise NotFoundError("Match not found.")
     return game
 
 
-async def match_view(db: AsyncSession, game: Game, viewer: Optional[User]) -> dict:
+async def match_view(db: AsyncSession, game: Game, viewer: User | None) -> dict:
     board: list = []
-    your_mark: Optional[str] = None
+    your_mark: str | None = None
     can_play = False
     if game.state:
         state = json.loads(game.state)
@@ -266,8 +290,10 @@ async def make_move(
     if user.id not in (game.player_one_id, game.player_two_id):
         raise AuthorizationError("You're not a player in this match.")
 
-    state = json.loads(game.state) if game.state else json.loads(
-        _initial_state(game.player_one_id, game.player_two_id)
+    state = (
+        json.loads(game.state)
+        if game.state
+        else json.loads(_initial_state(game.player_one_id, game.player_two_id))
     )
     mark = state["turn"]
     if state["marks"].get(mark) != str(user.id):
@@ -312,9 +338,20 @@ async def _notify_result(db: AsyncSession, game: Game) -> None:
         if game.winner_id is None:
             title, body = "Match finished — it's a draw", "Your game ended in a draw."
         elif pid == game.winner_id:
-            title, body = "You won the match!", "Well played — your rating has been updated."
+            title, body = (
+                "You won the match!",
+                "Well played — your rating has been updated.",
+            )
         else:
-            title, body = "Match finished", "Thanks for playing. Your rating has been updated."
+            title, body = (
+                "Match finished",
+                "Thanks for playing. Your rating has been updated.",
+            )
         await notification_service.notify(
-            db, pid, title, body, category="game", link=f"/games/{game.id}",
+            db,
+            pid,
+            title,
+            body,
+            category="game",
+            link=f"/games/{game.id}",
         )

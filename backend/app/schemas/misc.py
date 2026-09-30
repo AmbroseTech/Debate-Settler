@@ -1,16 +1,16 @@
 """Notification, dispute, category, game and admin schemas."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.base import DisputeStatus, GameStatus, GameType, NotificationChannel
 
-
 # --- Notifications ---
+
 
 class NotificationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -20,7 +20,7 @@ class NotificationOut(BaseModel):
     body: str
     category: str
     channel: NotificationChannel
-    link: Optional[str] = None
+    link: str | None = None
     read: bool
     created_at: datetime
 
@@ -30,16 +30,17 @@ class CreateNotificationRequest(BaseModel):
     title: str
     body: str
     category: str = "general"
-    link: Optional[str] = None
+    link: str | None = None
     channel: NotificationChannel = NotificationChannel.in_app
 
 
 # --- Disputes ---
 
+
 class DisputeCreate(BaseModel):
     debate_id: uuid.UUID
     reason: str = Field(..., min_length=5, max_length=2000)
-    evidence: Optional[str] = None
+    evidence: str | None = None
 
 
 class DisputeOut(BaseModel):
@@ -49,18 +50,19 @@ class DisputeOut(BaseModel):
     debate_id: uuid.UUID
     raised_by: uuid.UUID
     reason: str
-    evidence: Optional[str] = None
+    evidence: str | None = None
     status: DisputeStatus
-    resolution_notes: Optional[str] = None
+    resolution_notes: str | None = None
     created_at: datetime
 
 
 class DisputeResolve(BaseModel):
     status: DisputeStatus
-    resolution_notes: Optional[str] = None
+    resolution_notes: str | None = None
 
 
 # --- Categories ---
+
 
 class CategoryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -68,10 +70,11 @@ class CategoryOut(BaseModel):
     id: uuid.UUID
     name: str
     slug: str
-    icon: Optional[str] = None
+    icon: str | None = None
 
 
 # --- Games ---
+
 
 class GameCreate(BaseModel):
     game_type: GameType
@@ -83,11 +86,11 @@ class GameOut(BaseModel):
     id: uuid.UUID
     game_type: GameType
     status: GameStatus
-    player_one_id: Optional[uuid.UUID] = None
-    player_two_id: Optional[uuid.UUID] = None
-    state: Optional[str] = None
-    current_turn: Optional[uuid.UUID] = None
-    winner_id: Optional[uuid.UUID] = None
+    player_one_id: uuid.UUID | None = None
+    player_two_id: uuid.UUID | None = None
+    state: str | None = None
+    current_turn: uuid.UUID | None = None
+    winner_id: uuid.UUID | None = None
 
 
 class GameMoveRequest(BaseModel):
@@ -96,7 +99,7 @@ class GameMoveRequest(BaseModel):
 
 class ChallengeRequest(BaseModel):
     game_type: GameType
-    to_username: Optional[str] = Field(None, max_length=50)
+    to_username: str | None = Field(None, max_length=50)
 
 
 class GameInvitationOut(BaseModel):
@@ -104,8 +107,8 @@ class GameInvitationOut(BaseModel):
     game_id: uuid.UUID
     game_type: GameType
     status: str
-    to_username: Optional[str] = None
-    expires_at: Optional[datetime] = None
+    to_username: str | None = None
+    expires_at: datetime | None = None
     invite_url: str
 
 
@@ -116,7 +119,7 @@ class GamePreviewOut(BaseModel):
     invitation_status: str
     expired: bool
     inviter_username: str
-    to_username: Optional[str] = None
+    to_username: str | None = None
 
 
 class MoveRequest(BaseModel):
@@ -127,12 +130,12 @@ class MatchStateOut(BaseModel):
     id: uuid.UUID
     game_type: GameType
     status: GameStatus
-    player_one_id: Optional[uuid.UUID] = None
-    player_two_id: Optional[uuid.UUID] = None
-    current_turn: Optional[uuid.UUID] = None
-    winner_id: Optional[uuid.UUID] = None
-    board: List[Optional[str]] = []
-    your_mark: Optional[str] = None
+    player_one_id: uuid.UUID | None = None
+    player_two_id: uuid.UUID | None = None
+    current_turn: uuid.UUID | None = None
+    winner_id: uuid.UUID | None = None
+    board: list[str | None] = []
+    your_mark: str | None = None
     can_play: bool = False
 
 
@@ -144,24 +147,25 @@ class MoveResultOut(BaseModel):
 class LeaderboardEntry(BaseModel):
     rank: int
     username: str
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
+    display_name: str | None = None
+    avatar_url: str | None = None
     matches: int
     wins: int
     losses: int
     draws: int
     win_pct: float
     current_streak: int
-    rating: Optional[int] = None
+    rating: int | None = None
 
 
 class LeaderboardOut(BaseModel):
     game_type: GameType
     period: str
-    entries: List[LeaderboardEntry] = []
+    entries: list[LeaderboardEntry] = []
 
 
 # --- Admin ---
+
 
 class AdminStats(BaseModel):
     users: int
@@ -178,5 +182,5 @@ class SettlementSubmit(BaseModel):
     debate_id: uuid.UUID
     winner_side: str = Field(..., pattern="^(a|b|draw)$")
     source_verified: bool = True
-    settlement_source: Optional[str] = None
-    reason: Optional[str] = None
+    settlement_source: str | None = None
+    reason: str | None = None

@@ -3,6 +3,7 @@
 Technical details are logged on the server; users only ever see friendly,
 non-sensitive messages (see `app/core/exceptions.py`).
 """
+
 from __future__ import annotations
 
 import logging

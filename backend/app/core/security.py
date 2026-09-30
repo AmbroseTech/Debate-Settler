@@ -2,22 +2,23 @@
 
 Passwords are hashed with bcrypt and never stored or returned in plain text.
 """
+
 from __future__ import annotations
 
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import bcrypt
 import jwt
 
 from app.core.config import settings
 
-
 # --- Passwords -------------------------------------------------------------
 # bcrypt only considers the first 72 bytes of the input; encode and truncate
 # explicitly so longer passwords never raise. Hashing is done with bcrypt
 # directly (no passlib) to avoid version-detection fragility.
+
 
 def _pw_bytes(password: str) -> bytes:
     return password.encode("utf-8")[:72]
@@ -36,13 +37,19 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # --- JWT -------------------------------------------------------------------
 
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def create_access_token(subject: str, extra: Optional[Dict[str, Any]] = None) -> str:
+def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
     expire = _now() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload: Dict[str, Any] = {"sub": subject, "exp": expire, "iat": _now(), "type": "access"}
+    payload: dict[str, Any] = {
+        "sub": subject,
+        "exp": expire,
+        "iat": _now(),
+        "type": "access",
+    }
     if extra:
         payload.update(extra)
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
@@ -54,14 +61,17 @@ def create_refresh_token(subject: str) -> str:
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
-def decode_token(token: str) -> Optional[Dict[str, Any]]:
+def decode_token(token: str) -> dict[str, Any] | None:
     try:
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        return jwt.decode(
+            token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+        )
     except jwt.PyJWTError:
         return None
 
 
 # --- Opaque secure tokens (invitations, reset, verification) ---------------
+
 
 def generate_token_urlsafe(nbytes: int = 32) -> str:
     return secrets.token_urlsafe(nbytes)
@@ -78,7 +88,7 @@ ROLE_USER = "user"
 ROLE_MODERATOR = "moderator"
 ROLE_ADMIN = "admin"
 
-ALL_ROLES: List[str] = [ROLE_USER, ROLE_MODERATOR, ROLE_ADMIN]
+ALL_ROLES: list[str] = [ROLE_USER, ROLE_MODERATOR, ROLE_ADMIN]
 
 
 def role_at_least(role: str, minimum: str) -> bool:

@@ -3,12 +3,13 @@
 Each entry stores a hash of its own contents chained to the previous entry's
 hash, so any retro-active modification breaks the chain and is detectable.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.notification import AuditLog
 
 
-def _compute_hash(payload: str, previous_hash: Optional[str]) -> str:
+def _compute_hash(payload: str, previous_hash: str | None) -> str:
     data = f"{previous_hash or ''}|{payload}"
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
@@ -25,11 +26,11 @@ async def record_audit(
     db: AsyncSession,
     action: str,
     *,
-    actor_id: Optional[uuid.UUID] = None,
-    entity_type: Optional[str] = None,
-    entity_id: Optional[str] = None,
-    ip_address: Optional[str] = None,
-    details: Optional[dict[str, Any]] = None,
+    actor_id: uuid.UUID | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    ip_address: str | None = None,
+    details: dict[str, Any] | None = None,
 ) -> AuditLog:
     result = await db.execute(
         select(AuditLog).order_by(AuditLog.created_at.desc()).limit(1)

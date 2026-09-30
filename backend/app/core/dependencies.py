@@ -1,8 +1,8 @@
 """Shared FastAPI dependencies: current user, role checks, rate limiting."""
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -24,7 +24,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     if credentials is None:
@@ -47,9 +47,9 @@ async def get_current_user(
 
 
 async def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
-) -> Optional[User]:
+) -> User | None:
     if credentials is None:
         return None
     try:

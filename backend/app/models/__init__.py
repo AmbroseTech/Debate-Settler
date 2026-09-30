@@ -1,4 +1,5 @@
 """Model registry — import all models so Alembic metadata is complete."""
+
 from app.models.base import (
     Base,
     BaseModel,
@@ -17,16 +18,24 @@ from app.models.base import (
 from app.models.category import DEFAULT_CATEGORIES, Category
 from app.models.debate import (
     Debate,
+    DebateComment,
+    DebateCommentReaction,
     DebateEvent,
     DebateInvitation,
     DebateParticipant,
     DebateRules,
     DebateVote,
 )
-from app.models.notification import AuditLog, Dispute, Game, GameInvitation, GameStanding, Notification
-from app.models.user import Follow, Profile, User, UserPreferences, UserSession
-from app.models.debate import DebateComment, DebateCommentReaction
 from app.models.media import Media
+from app.models.notification import (
+    AuditLog,
+    Dispute,
+    Game,
+    GameInvitation,
+    GameStanding,
+    Notification,
+)
+from app.models.user import Follow, Profile, User, UserPreferences, UserSession
 
 __all__ = [
     "Base",

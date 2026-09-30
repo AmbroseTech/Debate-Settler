@@ -9,6 +9,7 @@ enforced while streaming, and stored files always get a generated safe filename
 Stored paths are relative to ``settings.MEDIA_ROOT`` and are resolved through the
 database — a client can never request an arbitrary filesystem path.
 """
+
 from __future__ import annotations
 
 import io
@@ -16,7 +17,6 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Tuple
 
 from fastapi import UploadFile
 from PIL import Image
@@ -31,8 +31,8 @@ _MAX_VIDEO_BYTES = settings.MAX_MEDIA_UPLOAD_MB * 1024 * 1024
 _UNSAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 # Leading magic bytes for the video containers we allow.
-_VIDEO_SIGNATURES: Tuple[Tuple[bytes, int], ...] = (
-    (b"ftyp", 4),   # mp4 / mov: bytes 4..8 are 'ftyp'
+_VIDEO_SIGNATURES: tuple[tuple[bytes, int], ...] = (
+    (b"ftyp", 4),  # mp4 / mov: bytes 4..8 are 'ftyp'
     (b"\x1a\x45\xdf\xa3", 0),  # webm / matroska EBML header
 )
 
@@ -43,7 +43,7 @@ def media_root() -> str:
     return root
 
 
-def safe_display_name(original: Optional[str]) -> str:
+def safe_display_name(original: str | None) -> str:
     """Sanitize a client filename for display only (never used as the stored path)."""
     name = os.path.basename(original or "upload")
     name = _UNSAFE_NAME.sub("_", name).strip("._")
@@ -65,12 +65,12 @@ def _extension_for(content_type: str) -> str:
 
 def _looks_like_video(head: bytes) -> bool:
     for signature, offset in _VIDEO_SIGNATURES:
-        if head[offset:offset + len(signature)] == signature:
+        if head[offset : offset + len(signature)] == signature:
             return True
     return False
 
 
-async def _measure_image(data: bytes) -> Tuple[int, int]:
+async def _measure_image(data: bytes) -> tuple[int, int]:
     with Image.open(io.BytesIO(data)) as img:
         return img.width, img.height
 
@@ -80,9 +80,9 @@ async def save_upload(
     *,
     kind: str,
     owner_id: uuid.UUID,
-    debate_id: Optional[uuid.UUID] = None,
+    debate_id: uuid.UUID | None = None,
     public: bool = True,
-    duration_seconds: Optional[float] = None,
+    duration_seconds: float | None = None,
 ) -> dict:
     """Validate and persist an upload. Returns metadata for the Media row.
 
@@ -93,11 +93,15 @@ async def save_upload(
 
     if kind in ("image", "avatar"):
         if content_type not in settings.ALLOWED_IMAGE_TYPES:
-            raise ValidationError("That image format isn't supported. Use JPEG, PNG, WEBP or GIF.")
+            raise ValidationError(
+                "That image format isn't supported. Use JPEG, PNG, WEBP or GIF."
+            )
         max_bytes = _MAX_IMAGE_BYTES
     elif kind == "video":
         if content_type not in settings.ALLOWED_VIDEO_TYPES:
-            raise ValidationError("That video format isn't supported. Use MP4, WEBM or MOV.")
+            raise ValidationError(
+                "That video format isn't supported. Use MP4, WEBM or MOV."
+            )
         max_bytes = _MAX_VIDEO_BYTES
     else:
         raise ValidationError("Unknown upload kind.")
@@ -113,7 +117,9 @@ async def save_upload(
         total += len(chunk)
         if total > max_bytes:
             limit_mb = max_bytes // (1024 * 1024)
-            raise ValidationError(f"That file is too large. The limit is {limit_mb} MB.")
+            raise ValidationError(
+                f"That file is too large. The limit is {limit_mb} MB."
+            )
         buffer.write(chunk)
 
     if total == 0:
@@ -128,10 +134,14 @@ async def save_upload(
         try:
             width, height = await _measure_image(data)
         except Exception:
-            raise ValidationError("That image file appears to be corrupted or mislabelled.")
+            raise ValidationError(
+                "That image file appears to be corrupted or mislabelled."
+            )
     else:
         if not _looks_like_video(head):
-            raise ValidationError("That video file appears to be corrupted or mislabelled.")
+            raise ValidationError(
+                "That video file appears to be corrupted or mislabelled."
+            )
 
     now = datetime.now(timezone.utc)
     subdir = os.path.join(kind, now.strftime("%Y"), now.strftime("%m"))

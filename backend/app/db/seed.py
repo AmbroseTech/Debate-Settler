@@ -7,6 +7,7 @@ is no money, wallet, staking, or payment functionality anywhere.
 
 Run with:  python -m app.db.seed
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -18,8 +19,8 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal, Base, engine
 from app.core.security import hash_password
 from app.models import (
-    Category,
     DEFAULT_CATEGORIES,
+    Category,
     Debate,
     DebateParticipant,
     DebateRules,
@@ -51,7 +52,9 @@ async def seed_categories(db) -> None:
 
 
 async def seed_users(db) -> list[User]:
-    existing = (await db.execute(select(User).where(User.username == "ambrose"))).scalar_one_or_none()
+    existing = (
+        await db.execute(select(User).where(User.username == "ambrose"))
+    ).scalar_one_or_none()
     if existing:
         return [existing]
     users = []
@@ -62,8 +65,11 @@ async def seed_users(db) -> list[User]:
     ]
     for username, email, role in specs:
         user = User(
-            username=username, email=email, hashed_password=hash_password("Password123!"),
-            role=role, email_verified=True,
+            username=username,
+            email=email,
+            hashed_password=hash_password("Password123!"),
+            role=role,
+            email_verified=True,
             terms_accepted_at=_now(),
         )
         db.add(user)
@@ -81,50 +87,96 @@ async def seed_debates(db, users: list[User]) -> None:
         return
     ambrose, grace = users[0], users[1]
 
-    sports = (await db.execute(select(Category).where(Category.name == "Sports"))).scalar_one_or_none()
-    tech = (await db.execute(select(Category).where(Category.name == "Technology"))).scalar_one_or_none()
+    sports = (
+        await db.execute(select(Category).where(Category.name == "Sports"))
+    ).scalar_one_or_none()
+    tech = (
+        await db.execute(select(Category).where(Category.name == "Technology"))
+    ).scalar_one_or_none()
 
     # Online result debate — settled by an agreed, verifiable source.
     online = Debate(
-        creator_id=ambrose.id, category_id=sports.id if sports else None,
-        mode=DebateMode.online, status=DebateStatus.open,
+        creator_id=ambrose.id,
+        category_id=sports.id if sports else None,
+        mode=DebateMode.online,
+        status=DebateStatus.open,
         question="Manchester United will beat Arsenal in the next match",
-        side_a_label="YES", side_b_label="NO", is_public=True,
-        start_at=_now(), end_at=_now() + timedelta(days=1),
-        timezone="UTC", views=120, shares=8,
+        side_a_label="YES",
+        side_b_label="NO",
+        is_public=True,
+        start_at=_now(),
+        end_at=_now() + timedelta(days=1),
+        timezone="UTC",
+        views=120,
+        shares=8,
     )
     db.add(online)
     await db.flush()
-    db.add(DebateRules(
-        debate_id=online.id, settlement_source="Official match result",
-        settlement_rule="YES wins if the official result records Manchester United as winner.",
-        event_date=_now() + timedelta(days=1),
-    ))
-    db.add(DebateParticipant(debate_id=online.id, user_id=ambrose.id, role=ParticipantRole.creator, side=Side.a, confirmed=True))
+    db.add(
+        DebateRules(
+            debate_id=online.id,
+            settlement_source="Official match result",
+            settlement_rule="YES wins if the official result records Manchester United as winner.",
+            event_date=_now() + timedelta(days=1),
+        )
+    )
+    db.add(
+        DebateParticipant(
+            debate_id=online.id,
+            user_id=ambrose.id,
+            role=ParticipantRole.creator,
+            side=Side.a,
+            confirmed=True,
+        )
+    )
 
     # Community-voted (local) debate.
     local = Debate(
-        creator_id=grace.id, category_id=tech.id if tech else None,
-        mode=DebateMode.local, status=DebateStatus.voting,
+        creator_id=grace.id,
+        category_id=tech.id if tech else None,
+        mode=DebateMode.local,
+        status=DebateStatus.voting,
         question="Which presentation was better?",
-        side_a_label="Team Alpha", side_b_label="Team Beta", is_public=True,
-        start_at=_now() - timedelta(hours=1), end_at=_now() + timedelta(hours=1),
-        timezone="UTC", views=45, shares=3,
+        side_a_label="Team Alpha",
+        side_b_label="Team Beta",
+        is_public=True,
+        start_at=_now() - timedelta(hours=1),
+        end_at=_now() + timedelta(hours=1),
+        timezone="UTC",
+        views=45,
+        shares=3,
         locked_at=_now() - timedelta(hours=2),
     )
     db.add(local)
     await db.flush()
-    db.add(DebateRules(
-        debate_id=local.id, required_voters=3, votes_public=True, allow_draw=True,
-        venue="Community Hall", city="Kampala", country="Uganda",
-    ))
-    db.add(DebateParticipant(debate_id=local.id, user_id=grace.id, role=ParticipantRole.creator, side=Side.a, confirmed=True))
+    db.add(
+        DebateRules(
+            debate_id=local.id,
+            required_voters=3,
+            votes_public=True,
+            allow_draw=True,
+            venue="Community Hall",
+            city="Kampala",
+            country="Uganda",
+        )
+    )
+    db.add(
+        DebateParticipant(
+            debate_id=local.id,
+            user_id=grace.id,
+            role=ParticipantRole.creator,
+            side=Side.a,
+            confirmed=True,
+        )
+    )
 
     await db.flush()
 
     for user in users:
         await notification_service.notify(
-            db, user.id, "Welcome to Debate Settler 👋",
+            db,
+            user.id,
+            "Welcome to Debate Settler 👋",
             "Explore trending debates or create your own to settle an argument.",
             category="onboarding",
         )

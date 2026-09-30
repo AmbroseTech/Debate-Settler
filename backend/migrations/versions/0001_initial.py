@@ -7,18 +7,19 @@ Create Date: 2026-09-18
 Debate Settler is a free global social debate platform. This schema contains no
 wallets, payments, deposits, withdrawals, staking, fees or any monetary tables.
 """
+
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0001_initial"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 UUID = postgresql.UUID(as_uuid=True)
 
@@ -26,8 +27,18 @@ UUID = postgresql.UUID(as_uuid=True)
 def _base_columns() -> list:
     return [
         sa.Column("id", UUID, primary_key=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     ]
 
 
@@ -42,13 +53,24 @@ def upgrade() -> None:
         sa.Column("role", sa.String(20), nullable=False, server_default="user"),
         sa.Column("status", sa.String(20), nullable=False, server_default="active"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("email_verified", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("phone_verified", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "email_verified", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+        sa.Column(
+            "phone_verified", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
         sa.Column("terms_accepted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("country_code", sa.String(2), nullable=True),
-        sa.Column("failed_login_attempts", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "failed_login_attempts", sa.Integer(), nullable=False, server_default="0"
+        ),
         sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("two_factor_enabled", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "two_factor_enabled",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
     )
     op.create_index("ix_users_username", "users", ["username"], unique=True)
     op.create_index("ix_users_email", "users", ["email"], unique=True)
@@ -57,13 +79,20 @@ def upgrade() -> None:
     op.create_table(
         "profiles",
         *_base_columns(),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("display_name", sa.String(100), nullable=True),
         sa.Column("avatar_url", sa.String(500), nullable=True),
         sa.Column("bio", sa.Text(), nullable=True),
         sa.Column("favorite_categories", sa.Text(), nullable=True),
         sa.Column("debates_created", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("debates_participated", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "debates_participated", sa.Integer(), nullable=False, server_default="0"
+        ),
         sa.Column("wins", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("losses", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("draws", sa.Integer(), nullable=False, server_default="0"),
@@ -73,7 +102,12 @@ def upgrade() -> None:
     op.create_table(
         "user_preferences",
         *_base_columns(),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("notify_in_app", sa.Boolean(), server_default=sa.true()),
         sa.Column("notify_email", sa.Boolean(), server_default=sa.true()),
         sa.Column("notify_push", sa.Boolean(), server_default=sa.false()),
@@ -83,12 +117,19 @@ def upgrade() -> None:
         sa.Column("show_tutorial", sa.Boolean(), server_default=sa.true()),
         sa.Column("theme", sa.String(20), server_default="system"),
     )
-    op.create_index("ix_user_preferences_user_id", "user_preferences", ["user_id"], unique=True)
+    op.create_index(
+        "ix_user_preferences_user_id", "user_preferences", ["user_id"], unique=True
+    )
 
     op.create_table(
         "user_sessions",
         *_base_columns(),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("refresh_token_hash", sa.String(255), nullable=False),
         sa.Column("ip_address", sa.String(45), nullable=True),
         sa.Column("user_agent", sa.Text(), nullable=True),
@@ -100,8 +141,18 @@ def upgrade() -> None:
     op.create_table(
         "follows",
         *_base_columns(),
-        sa.Column("follower_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("following_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "follower_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "following_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_follows_follower_id", "follows", ["follower_id"])
     op.create_index("ix_follows_following_id", "follows", ["following_id"])
@@ -149,7 +200,12 @@ def upgrade() -> None:
     op.create_table(
         "debate_rules",
         *_base_columns(),
-        sa.Column("debate_id", UUID, sa.ForeignKey("debates.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "debate_id",
+            UUID,
+            sa.ForeignKey("debates.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("required_voters", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("votes_public", sa.Boolean(), server_default=sa.true()),
         sa.Column("allow_draw", sa.Boolean(), server_default=sa.true()),
@@ -163,12 +219,19 @@ def upgrade() -> None:
         sa.Column("settlement_rule", sa.Text(), nullable=True),
         sa.Column("event_date", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_index("ix_debate_rules_debate_id", "debate_rules", ["debate_id"], unique=True)
+    op.create_index(
+        "ix_debate_rules_debate_id", "debate_rules", ["debate_id"], unique=True
+    )
 
     op.create_table(
         "debate_participants",
         *_base_columns(),
-        sa.Column("debate_id", UUID, sa.ForeignKey("debates.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "debate_id",
+            UUID,
+            sa.ForeignKey("debates.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("user_id", UUID, sa.ForeignKey("users.id"), nullable=True),
         sa.Column("role", sa.String(20), nullable=False),
         sa.Column("side", sa.String(5), nullable=True),
@@ -176,13 +239,22 @@ def upgrade() -> None:
         sa.Column("rules_agreed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("joined_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_index("ix_debate_participants_debate_id", "debate_participants", ["debate_id"])
-    op.create_index("ix_debate_participants_user_id", "debate_participants", ["user_id"])
+    op.create_index(
+        "ix_debate_participants_debate_id", "debate_participants", ["debate_id"]
+    )
+    op.create_index(
+        "ix_debate_participants_user_id", "debate_participants", ["user_id"]
+    )
 
     op.create_table(
         "debate_invitations",
         *_base_columns(),
-        sa.Column("debate_id", UUID, sa.ForeignKey("debates.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "debate_id",
+            UUID,
+            sa.ForeignKey("debates.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("token", sa.String(120), nullable=False),
         sa.Column("kind", sa.String(20), nullable=False, server_default="voter"),
         sa.Column("invited_email", sa.String(255), nullable=True),
@@ -193,16 +265,27 @@ def upgrade() -> None:
         sa.Column("used", sa.Boolean(), server_default=sa.false()),
         sa.Column("response", sa.String(20), nullable=True),
     )
-    op.create_index("ix_debate_invitations_token", "debate_invitations", ["token"], unique=True)
-    op.create_index("ix_debate_invitations_debate_id", "debate_invitations", ["debate_id"])
+    op.create_index(
+        "ix_debate_invitations_token", "debate_invitations", ["token"], unique=True
+    )
+    op.create_index(
+        "ix_debate_invitations_debate_id", "debate_invitations", ["debate_id"]
+    )
 
     op.create_table(
         "debate_votes",
         *_base_columns(),
-        sa.Column("debate_id", UUID, sa.ForeignKey("debates.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "debate_id",
+            UUID,
+            sa.ForeignKey("debates.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("voter_id", UUID, sa.ForeignKey("users.id"), nullable=False),
         sa.Column("choice", sa.String(10), nullable=False),
-        sa.Column("invitation_id", UUID, sa.ForeignKey("debate_invitations.id"), nullable=True),
+        sa.Column(
+            "invitation_id", UUID, sa.ForeignKey("debate_invitations.id"), nullable=True
+        ),
         sa.Column("is_valid", sa.Boolean(), server_default=sa.true()),
         sa.Column("changed", sa.Boolean(), server_default=sa.false()),
         sa.UniqueConstraint("debate_id", "voter_id", name="uq_vote_debate_voter"),
@@ -213,7 +296,12 @@ def upgrade() -> None:
     op.create_table(
         "debate_events",
         *_base_columns(),
-        sa.Column("debate_id", UUID, sa.ForeignKey("debates.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "debate_id",
+            UUID,
+            sa.ForeignKey("debates.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("event_type", sa.String(60), nullable=False),
         sa.Column("payload", sa.Text(), nullable=True),
         sa.Column("actor_id", UUID, sa.ForeignKey("users.id"), nullable=True),
@@ -223,9 +311,24 @@ def upgrade() -> None:
     op.create_table(
         "debate_comments",
         *_base_columns(),
-        sa.Column("debate_id", UUID, sa.ForeignKey("debates.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("parent_id", UUID, sa.ForeignKey("debate_comments.id", ondelete="CASCADE"), nullable=True),
+        sa.Column(
+            "debate_id",
+            UUID,
+            sa.ForeignKey("debates.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "user_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "parent_id",
+            UUID,
+            sa.ForeignKey("debate_comments.id", ondelete="CASCADE"),
+            nullable=True,
+        ),
         sa.Column("body", sa.Text(), nullable=False),
         sa.Column("pinned", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("hidden", sa.Boolean(), nullable=False, server_default=sa.false()),
@@ -236,18 +339,44 @@ def upgrade() -> None:
     op.create_table(
         "debate_comment_reactions",
         *_base_columns(),
-        sa.Column("comment_id", UUID, sa.ForeignKey("debate_comments.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "comment_id",
+            UUID,
+            sa.ForeignKey("debate_comments.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "user_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("reaction", sa.String(20), nullable=False),
     )
-    op.create_index("ix_debate_comment_reactions_comment_id", "debate_comment_reactions", ["comment_id"])
-    op.create_index("ix_debate_comment_reactions_user_id", "debate_comment_reactions", ["user_id"])
+    op.create_index(
+        "ix_debate_comment_reactions_comment_id",
+        "debate_comment_reactions",
+        ["comment_id"],
+    )
+    op.create_index(
+        "ix_debate_comment_reactions_user_id", "debate_comment_reactions", ["user_id"]
+    )
 
     op.create_table(
         "media",
         *_base_columns(),
-        sa.Column("owner_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("debate_id", UUID, sa.ForeignKey("debates.id", ondelete="CASCADE"), nullable=True),
+        sa.Column(
+            "owner_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "debate_id",
+            UUID,
+            sa.ForeignKey("debates.id", ondelete="CASCADE"),
+            nullable=True,
+        ),
         sa.Column("kind", sa.String(20), nullable=False, server_default="image"),
         sa.Column("file_path", sa.String(500), nullable=False),
         sa.Column("original_filename", sa.String(255), nullable=False),
@@ -266,7 +395,12 @@ def upgrade() -> None:
     op.create_table(
         "notifications",
         *_base_columns(),
-        sa.Column("user_id", UUID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            UUID,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("channel", sa.String(20), nullable=False, server_default="in_app"),
         sa.Column("title", sa.String(200), nullable=False),
         sa.Column("body", sa.Text(), nullable=False),
@@ -325,10 +459,24 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     for table in [
-        "games", "audit_logs", "disputes", "notifications", "media",
-        "debate_comment_reactions", "debate_comments", "debate_events",
-        "debate_votes", "debate_invitations", "debate_participants", "debate_rules",
-        "debates", "categories", "follows", "user_sessions", "user_preferences",
-        "profiles", "users",
+        "games",
+        "audit_logs",
+        "disputes",
+        "notifications",
+        "media",
+        "debate_comment_reactions",
+        "debate_comments",
+        "debate_events",
+        "debate_votes",
+        "debate_invitations",
+        "debate_participants",
+        "debate_rules",
+        "debates",
+        "categories",
+        "follows",
+        "user_sessions",
+        "user_preferences",
+        "profiles",
+        "users",
     ]:
         op.drop_table(table)

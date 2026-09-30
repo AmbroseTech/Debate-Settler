@@ -1,4 +1,5 @@
 """Games are free social play — there is no money anywhere on the platform."""
+
 from __future__ import annotations
 
 import pytest

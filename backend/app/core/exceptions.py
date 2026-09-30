@@ -3,9 +3,10 @@
 Users never see raw stack traces or technical jargon. Each domain error maps to
 a clear, plain-English message (see master build prompt §57 and §73).
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 
 class AppError(Exception):
@@ -15,7 +16,7 @@ class AppError(Exception):
     code: str = "app_error"
     user_message: str = "Something went wrong. Please try again."
 
-    def __init__(self, user_message: Optional[str] = None, **context: Any) -> None:
+    def __init__(self, user_message: str | None = None, **context: Any) -> None:
         self.user_message = user_message or self.user_message
         self.context = context
         super().__init__(self.user_message)
@@ -60,7 +61,9 @@ class RateLimitedError(AppError):
 class AccountLockedError(AppError):
     status_code = 423
     code = "account_locked"
-    user_message = "Your account is temporarily locked for security. Please try again later."
+    user_message = (
+        "Your account is temporarily locked for security. Please try again later."
+    )
 
 
 class FeatureDisabledError(AppError):

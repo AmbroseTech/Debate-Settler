@@ -8,19 +8,19 @@ best-effort in-process store so a single-instance deployment (and the test
 suite) keeps working. Brute-force protection does not rely on this alone — the
 database also tracks failed login attempts and lockout (see auth_service).
 """
+
 from __future__ import annotations
 
 import time
-from typing import Dict, Optional, Tuple
 
 import redis.asyncio as redis
 
 from app.core.config import settings
 
-_pool: Optional[redis.Redis] = None
+_pool: redis.Redis | None = None
 
 # Best-effort in-process fallback: key -> (value, expires_at_epoch_or_None)
-_fallback: Dict[str, Tuple[str, Optional[float]]] = {}
+_fallback: dict[str, tuple[str, float | None]] = {}
 
 
 def get_redis() -> redis.Redis:
@@ -42,7 +42,9 @@ async def close_redis() -> None:
 
 
 def _is_conn_error(exc: Exception) -> bool:
-    return isinstance(exc, (redis.ConnectionError, redis.TimeoutError, ConnectionError, OSError))
+    return isinstance(
+        exc, (redis.ConnectionError, redis.TimeoutError, ConnectionError, OSError)
+    )
 
 
 def _fb_expired(key: str) -> bool:
@@ -67,7 +69,7 @@ async def incr_rate_limit(key: str, window_seconds: int) -> int:
         if current == 1:
             await client.expire(key, window_seconds)
         return int(current)
-    except Exception as exc:  # noqa: BLE001 - degrade gracefully
+    except Exception as exc:
         if not _is_conn_error(exc):
             raise
         now = time.time()
@@ -80,10 +82,10 @@ async def incr_rate_limit(key: str, window_seconds: int) -> int:
         return new
 
 
-async def cache_get(key: str) -> Optional[str]:
+async def cache_get(key: str) -> str | None:
     try:
         return await get_redis().get(key)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if not _is_conn_error(exc):
             raise
         if _fb_expired(key):
@@ -94,7 +96,7 @@ async def cache_get(key: str) -> Optional[str]:
 async def cache_set(key: str, value: str, ttl_seconds: int = 60) -> None:
     try:
         await get_redis().set(key, value, ex=ttl_seconds)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if not _is_conn_error(exc):
             raise
         expires_at = time.time() + ttl_seconds if ttl_seconds else None
@@ -104,7 +106,7 @@ async def cache_set(key: str, value: str, ttl_seconds: int = 60) -> None:
 async def cache_delete(key: str) -> None:
     try:
         await get_redis().delete(key)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if not _is_conn_error(exc):
             raise
     finally:

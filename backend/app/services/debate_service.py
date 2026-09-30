@@ -4,11 +4,11 @@ The backend is the source of truth for rules, votes and deadlines.
 Once a debate is locked its core terms are immutable (§81). Time comparisons
 always use the server clock, never the client's (§14).
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -18,7 +18,6 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import (
     ConflictError,
     DebateLockedError,
-    FeatureDisabledError,
     NotFoundError,
     ValidationError,
 )
@@ -31,7 +30,6 @@ from app.models.base import (
     UserRole,
     VoteChoice,
 )
-from app.models.category import Category
 from app.models.debate import (
     Debate,
     DebateEvent,
@@ -40,7 +38,7 @@ from app.models.debate import (
     DebateRules,
     DebateVote,
 )
-from app.models.user import User, Profile
+from app.models.user import Profile, User
 from app.schemas.debate import DebateCreate
 from app.services import notification_service
 from app.services.audit_service import record_audit
@@ -51,7 +49,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+def _aware(dt: datetime | None) -> datetime | None:
     """Coerce DB datetimes to UTC-aware; SQLite round-trips them naive."""
     if dt is None:
         return None
@@ -59,10 +57,20 @@ def _aware(dt: Optional[datetime]) -> Optional[datetime]:
 
 
 async def _add_event(
-    db: AsyncSession, debate_id: uuid.UUID, event_type: str,
-    actor_id: Optional[uuid.UUID] = None, payload: Optional[str] = None,
+    db: AsyncSession,
+    debate_id: uuid.UUID,
+    event_type: str,
+    actor_id: uuid.UUID | None = None,
+    payload: str | None = None,
 ) -> None:
-    db.add(DebateEvent(debate_id=debate_id, event_type=event_type, actor_id=actor_id, payload=payload))
+    db.add(
+        DebateEvent(
+            debate_id=debate_id,
+            event_type=event_type,
+            actor_id=actor_id,
+            payload=payload,
+        )
+    )
 
 
 async def create_debate(db: AsyncSession, user: User, data: DebateCreate) -> Debate:
@@ -91,20 +99,30 @@ async def create_debate(db: AsyncSession, user: User, data: DebateCreate) -> Deb
     # Creator is Side A until an opponent joins as Side B.
     db.add(
         DebateParticipant(
-            debate_id=debate.id, user_id=user.id,
-            role=ParticipantRole.creator, side=Side.a, confirmed=True, joined_at=_now(),
+            debate_id=debate.id,
+            user_id=user.id,
+            role=ParticipantRole.creator,
+            side=Side.a,
+            confirmed=True,
+            joined_at=_now(),
         )
     )
     await _add_event(db, debate.id, "created", actor_id=user.id)
     await record_audit(
-        db, "debate_creation", actor_id=user.id, entity_type="debate", entity_id=str(debate.id),
+        db,
+        "debate_creation",
+        actor_id=user.id,
+        entity_type="debate",
+        entity_id=str(debate.id),
         details={"mode": data.mode.value},
     )
 
     # Increment creator's debates_created stat.
     from app.models.user import Profile
 
-    prof = (await db.execute(select(Profile).where(Profile.user_id == user.id))).scalar_one_or_none()
+    prof = (
+        await db.execute(select(Profile).where(Profile.user_id == user.id))
+    ).scalar_one_or_none()
     if prof:
         prof.debates_created += 1
 
@@ -131,11 +149,11 @@ async def get_debate(db: AsyncSession, debate_id: uuid.UUID) -> Debate:
     return debate
 
 
-def is_staff(user: Optional[User]) -> bool:
+def is_staff(user: User | None) -> bool:
     return bool(user) and user.role in (UserRole.admin, UserRole.moderator)
 
 
-def is_debate_member(debate: Debate, user: Optional[User]) -> bool:
+def is_debate_member(debate: Debate, user: User | None) -> bool:
     if user is None:
         return False
     if user.id == debate.creator_id:
@@ -143,18 +161,19 @@ def is_debate_member(debate: Debate, user: Optional[User]) -> bool:
     return any(p.user_id == user.id for p in debate.participants)
 
 
-def is_debate_side(debate: Debate, user: Optional[User]) -> bool:
+def is_debate_side(debate: Debate, user: User | None) -> bool:
     if user is None:
         return False
     if user.id == debate.creator_id:
         return True
     return any(
-        p.user_id == user.id and p.role in (ParticipantRole.creator, ParticipantRole.challenger)
+        p.user_id == user.id
+        and p.role in (ParticipantRole.creator, ParticipantRole.challenger)
         for p in debate.participants
     )
 
 
-def can_view(debate: Debate, user: Optional[User]) -> bool:
+def can_view(debate: Debate, user: User | None) -> bool:
     """Backend-authoritative privacy (§4.2): a private debate is visible only to
     its creator, its participants and staff. Public debates are visible to all."""
     if debate.is_public or is_staff(user) or is_debate_member(debate, user):
@@ -162,24 +181,33 @@ def can_view(debate: Debate, user: Optional[User]) -> bool:
     return False
 
 
-async def assert_can_view(debate: Debate, user: Optional[User]) -> None:
+async def assert_can_view(debate: Debate, user: User | None) -> None:
     # 404 rather than 403 so a private debate's very existence is not leaked.
     if not can_view(debate, user):
         raise NotFoundError("Debate not found.")
 
 
 async def list_voters(
-    db: AsyncSession, debate: Debate, viewer: Optional[User],
-    *, limit: int = 50, offset: int = 0,
+    db: AsyncSession,
+    debate: Debate,
+    viewer: User | None,
+    *,
+    limit: int = 50,
+    offset: int = 0,
 ) -> dict:
     """People who voted (§5): identities only, never the side chosen. Individual
     vote choices are never read or serialized here."""
     valid_ids = (
-        await db.execute(
-            select(DebateVote.voter_id)
-            .where(DebateVote.debate_id == debate.id, DebateVote.is_valid.is_(True))
+        (
+            await db.execute(
+                select(DebateVote.voter_id).where(
+                    DebateVote.debate_id == debate.id, DebateVote.is_valid.is_(True)
+                )
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     total = len(valid_ids)
 
     rules = debate.rules
@@ -188,8 +216,10 @@ async def list_voters(
 
     if not reveal:
         # Preserve anonymity: expose the count but not who took part (§5.1).
-        masked = [{"username": f"Community member", "display_name": None, "avatar_url": None}
-                  for _ in valid_ids[offset: offset + limit]]
+        masked = [
+            {"username": "Community member", "display_name": None, "avatar_url": None}
+            for _ in valid_ids[offset : offset + limit]
+        ]
         return {"total": total, "voters": masked, "identities_public": False}
 
     rows = (
@@ -198,7 +228,8 @@ async def list_voters(
             .join(Profile, Profile.user_id == User.id)
             .where(User.id.in_(valid_ids))
             .order_by(User.username.asc())
-            .limit(limit).offset(offset)
+            .limit(limit)
+            .offset(offset)
         )
     ).all()
     voters = [
@@ -208,11 +239,17 @@ async def list_voters(
 
 
 async def create_invitation(
-    db: AsyncSession, debate: Debate, kind: str, max_uses: int,
-    expires_in_hours: int, invited_email: Optional[str] = None,
+    db: AsyncSession,
+    debate: Debate,
+    kind: str,
+    max_uses: int,
+    expires_in_hours: int,
+    invited_email: str | None = None,
 ) -> DebateInvitation:
     if kind == "voter" and debate.locked_at is None:
-        raise ConflictError("Voter invitations open after both debators agree and lock the rules.")
+        raise ConflictError(
+            "Voter invitations open after both debators agree and lock the rules."
+        )
     if debate.locked_at is not None and kind == "opponent":
         raise DebateLockedError()
     if kind == "voter" and max_uses < 1:
@@ -248,12 +285,20 @@ def build_share_links(base_url: str, token: str) -> dict:
     }
 
 
-async def accept_invitation(db: AsyncSession, token: str, user: User) -> DebateInvitation:
-    result = await db.execute(select(DebateInvitation).where(DebateInvitation.token == token))
+async def accept_invitation(
+    db: AsyncSession, token: str, user: User
+) -> DebateInvitation:
+    result = await db.execute(
+        select(DebateInvitation).where(DebateInvitation.token == token)
+    )
     invitation = result.scalar_one_or_none()
     if invitation is None:
         raise NotFoundError("This invitation link is not valid.")
-    if invitation.response == "declined" or invitation.used or (_aware(invitation.expires_at) and _aware(invitation.expires_at) < _now()):
+    if (
+        invitation.response == "declined"
+        or invitation.used
+        or (_aware(invitation.expires_at) and _aware(invitation.expires_at) < _now())
+    ):
         raise ConflictError("This invitation has expired or already been used.")
     if invitation.use_count >= invitation.max_uses:
         raise ConflictError("This invitation has reached its usage limit.")
@@ -268,13 +313,18 @@ async def accept_invitation(db: AsyncSession, token: str, user: User) -> DebateI
     if invitation.use_count >= invitation.max_uses:
         invitation.used = True
     invitation.accepted_by = user.id
-    await _add_event(db, debate.id, f"invitation_accepted:{invitation.kind}", actor_id=user.id)
+    await _add_event(
+        db, debate.id, f"invitation_accepted:{invitation.kind}", actor_id=user.id
+    )
 
     # Notify the creator.
     await notification_service.notify(
-        db, debate.creator_id, "Your debate invitation was accepted",
+        db,
+        debate.creator_id,
+        "Your debate invitation was accepted",
         f"{user.username} accepted your invitation to “{debate.question}”.",
-        category="debate", link=f"/debates/{debate.id}",
+        category="debate",
+        link=f"/debates/{debate.id}",
     )
     await db.flush()
     return invitation
@@ -296,20 +346,27 @@ async def _join_as_opponent(db: AsyncSession, debate: Debate, user: User) -> Non
 
     db.add(
         DebateParticipant(
-            debate_id=debate.id, user_id=user.id,
-            role=ParticipantRole.challenger, side=Side.b, joined_at=_now(),
+            debate_id=debate.id,
+            user_id=user.id,
+            role=ParticipantRole.challenger,
+            side=Side.b,
+            joined_at=_now(),
         )
     )
     if debate.status in (DebateStatus.open, DebateStatus.draft):
         debate.status = DebateStatus.open
     from app.models.user import Profile
 
-    prof = (await db.execute(select(Profile).where(Profile.user_id == user.id))).scalar_one_or_none()
+    prof = (
+        await db.execute(select(Profile).where(Profile.user_id == user.id))
+    ).scalar_one_or_none()
     if prof:
         prof.debates_participated += 1
 
 
-async def _join_as_voter(db: AsyncSession, debate: Debate, user: User, invitation: DebateInvitation) -> None:
+async def _join_as_voter(
+    db: AsyncSession, debate: Debate, user: User, invitation: DebateInvitation
+) -> None:
     if debate.mode != DebateMode.local:
         raise ConflictError("Only local debates accept voters.")
     existing = await db.execute(
@@ -323,20 +380,26 @@ async def _join_as_voter(db: AsyncSession, debate: Debate, user: User, invitatio
         return  # idempotent
     db.add(
         DebateParticipant(
-            debate_id=debate.id, user_id=user.id,
-            role=ParticipantRole.voter, joined_at=_now(),
+            debate_id=debate.id,
+            user_id=user.id,
+            role=ParticipantRole.voter,
+            joined_at=_now(),
         )
     )
 
 
-async def confirm_side(db: AsyncSession, debate: Debate, user: User, side: Side) -> None:
+async def confirm_side(
+    db: AsyncSession, debate: Debate, user: User, side: Side
+) -> None:
     if debate.locked_at is not None:
         raise DebateLockedError()
     result = await db.execute(
         select(DebateParticipant).where(
             DebateParticipant.debate_id == debate.id,
             DebateParticipant.user_id == user.id,
-            DebateParticipant.role.in_([ParticipantRole.creator, ParticipantRole.challenger]),
+            DebateParticipant.role.in_(
+                [ParticipantRole.creator, ParticipantRole.challenger]
+            ),
         )
     )
     participant = result.scalar_one_or_none()
@@ -345,7 +408,13 @@ async def confirm_side(db: AsyncSession, debate: Debate, user: User, side: Side)
     participant.confirmed = True
     participant.side = side
     await _add_event(db, debate.id, f"side_confirmed:{side.value}", actor_id=user.id)
-    await record_audit(db, "debate_side_confirmed", actor_id=user.id, entity_type="debate", entity_id=str(debate.id))
+    await record_audit(
+        db,
+        "debate_side_confirmed",
+        actor_id=user.id,
+        entity_type="debate",
+        entity_id=str(debate.id),
+    )
     await db.flush()
 
 
@@ -355,32 +424,52 @@ async def lock_debate(db: AsyncSession, debate: Debate, actor: User) -> Debate:
         raise DebateLockedError()
 
     participants = (
-        await db.execute(
-            select(DebateParticipant).where(
-                DebateParticipant.debate_id == debate.id,
-                DebateParticipant.role.in_([ParticipantRole.creator, ParticipantRole.challenger]),
+        (
+            await db.execute(
+                select(DebateParticipant).where(
+                    DebateParticipant.debate_id == debate.id,
+                    DebateParticipant.role.in_(
+                        [ParticipantRole.creator, ParticipantRole.challenger]
+                    ),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     sides = {p.side for p in participants}
     if Side.a not in sides or Side.b not in sides:
         raise ConflictError("Both sides must join before the debate can be locked.")
     if not all(p.confirmed for p in participants):
         raise ConflictError("Both sides must confirm the rules before locking.")
-    if debate.mode == DebateMode.online and (not debate.rules or not debate.rules.settlement_source):
-        raise ValidationError("An Online Result Debate needs a settlement source before locking.")
+    if debate.mode == DebateMode.online and (
+        not debate.rules or not debate.rules.settlement_source
+    ):
+        raise ValidationError(
+            "An Online Result Debate needs a settlement source before locking."
+        )
 
     debate.locked_at = _now()
     debate.status = DebateStatus.active
     await _add_event(db, debate.id, "locked", actor_id=actor.id)
-    await record_audit(db, "debate_locking", actor_id=actor.id, entity_type="debate", entity_id=str(debate.id))
+    await record_audit(
+        db,
+        "debate_locking",
+        actor_id=actor.id,
+        entity_type="debate",
+        entity_id=str(debate.id),
+    )
     await db.flush()
     return debate
 
 
-async def cast_vote(db: AsyncSession, debate: Debate, user: User, choice: VoteChoice) -> Tuple[bool, str]:
+async def cast_vote(
+    db: AsyncSession, debate: Debate, user: User, choice: VoteChoice
+) -> tuple[bool, str]:
     if debate.locked_at is None:
-        raise ConflictError("Voting opens after both debators agree to the rules and lock the debate.")
+        raise ConflictError(
+            "Voting opens after both debators agree to the rules and lock the debate."
+        )
     if debate.mode != DebateMode.local:
         raise ConflictError("Only local debates use audience voting.")
     now = _now()
@@ -388,7 +477,11 @@ async def cast_vote(db: AsyncSession, debate: Debate, user: User, choice: VoteCh
         raise ConflictError("Voting hasn't started yet.")
     if debate.end_at and now > _aware(debate.end_at):
         raise ConflictError("Voting has closed.")
-    if debate.status not in (DebateStatus.active, DebateStatus.voting, DebateStatus.closing_soon):
+    if debate.status not in (
+        DebateStatus.active,
+        DebateStatus.voting,
+        DebateStatus.closing_soon,
+    ):
         raise ConflictError("This debate isn't accepting votes right now.")
 
     # Voter must be a registered participant (via invitation) — §17.
@@ -415,7 +508,9 @@ async def cast_vote(db: AsyncSession, debate: Debate, user: User, choice: VoteCh
     allow_change = debate.rules.allow_vote_change if debate.rules else False
     if existing is not None:
         if not allow_change:
-            raise ConflictError("You've already voted. Votes can't be changed in this debate.")
+            raise ConflictError(
+                "You've already voted. Votes can't be changed in this debate."
+            )
         existing.choice = choice
         existing.changed = True
         await _add_event(db, debate.id, "vote_changed", actor_id=user.id)
@@ -424,12 +519,22 @@ async def cast_vote(db: AsyncSession, debate: Debate, user: User, choice: VoteCh
 
     try:
         async with db.begin_nested():
-            db.add(DebateVote(debate_id=debate.id, voter_id=user.id, choice=choice, is_valid=True))
+            db.add(
+                DebateVote(
+                    debate_id=debate.id, voter_id=user.id, choice=choice, is_valid=True
+                )
+            )
             await db.flush()
     except IntegrityError:
         raise ConflictError("You've already voted in this debate.")
     await _add_event(db, debate.id, "vote_cast", actor_id=user.id)
-    await record_audit(db, "vote_submission", actor_id=user.id, entity_type="debate", entity_id=str(debate.id))
+    await record_audit(
+        db,
+        "vote_submission",
+        actor_id=user.id,
+        entity_type="debate",
+        entity_id=str(debate.id),
+    )
     await db.flush()
     return True, "Your vote has been recorded."
 
@@ -441,8 +546,15 @@ async def vote_counts(db: AsyncSession, debate: Debate, reveal: bool) -> dict:
     ).scalar_one_or_none()
     required = rules.required_voters if rules else 0
     votes_public = rules.votes_public if rules else True
-    revealed = reveal or votes_public or debate.status in (
-        DebateStatus.closed, DebateStatus.settled, DebateStatus.draw,
+    revealed = (
+        reveal
+        or votes_public
+        or debate.status
+        in (
+            DebateStatus.closed,
+            DebateStatus.settled,
+            DebateStatus.draw,
+        )
     )
     side_a = tally["side_a"] if revealed else 0
     side_b = tally["side_b"] if revealed else 0
@@ -467,16 +579,17 @@ async def vote_counts(db: AsyncSession, debate: Debate, reveal: bool) -> dict:
 
 # --- Listing / trending / search (§46, §47) ---
 
+
 async def list_debates(
     db: AsyncSession,
     *,
-    status: Optional[DebateStatus] = None,
-    mode: Optional[DebateMode] = None,
-    category_id: Optional[uuid.UUID] = None,
+    status: DebateStatus | None = None,
+    mode: DebateMode | None = None,
+    category_id: uuid.UUID | None = None,
     public_only: bool = True,
     limit: int = 20,
     offset: int = 0,
-) -> Tuple[List[Debate], int]:
+) -> tuple[list[Debate], int]:
     query = select(Debate)
     if public_only:
         query = query.where(Debate.is_public.is_(True))
@@ -494,7 +607,7 @@ async def list_debates(
     return list(result.scalars().all()), total
 
 
-async def trending_debates(db: AsyncSession, limit: int = 10) -> List[Debate]:
+async def trending_debates(db: AsyncSession, limit: int = 10) -> list[Debate]:
     """Traditional engagement ranking — no AI (§46).
 
     Score = views + 3*shares + 2*comments + participants-weighted freshness.
@@ -518,7 +631,9 @@ async def trending_debates(db: AsyncSession, limit: int = 10) -> List[Debate]:
     return debates[:limit]
 
 
-async def search_debates(db: AsyncSession, term: str, limit: int = 20, offset: int = 0) -> Tuple[List[Debate], int]:
+async def search_debates(
+    db: AsyncSession, term: str, limit: int = 20, offset: int = 0
+) -> tuple[list[Debate], int]:
     pattern = f"%{term}%"
     query = select(Debate).where(
         Debate.is_public.is_(True),
@@ -528,5 +643,7 @@ async def search_debates(db: AsyncSession, term: str, limit: int = 20, offset: i
     )
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar_one()
-    result = await db.execute(query.order_by(Debate.created_at.desc()).limit(limit).offset(offset))
+    result = await db.execute(
+        query.order_by(Debate.created_at.desc()).limit(limit).offset(offset)
+    )
     return list(result.scalars().all()), total

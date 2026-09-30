@@ -4,10 +4,10 @@ All uploads require authentication. Type, size and integrity are validated by th
 media service. Private media is only served to its owner or the participants of
 the debate it belongs to.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import FileResponse
@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, get_optional_user
-from app.core.exceptions import NotFoundError, AuthorizationError
+from app.core.exceptions import AuthorizationError, NotFoundError
 from app.models.debate import Debate, DebateParticipant
 from app.models.media import Media
 from app.models.user import Profile, User
@@ -34,15 +34,22 @@ def _media_url(media_id: uuid.UUID) -> str:
 
 def _to_out(media: Media) -> MediaOut:
     return MediaOut(
-        id=media.id, kind=media.kind, url=_media_url(media.id),
-        original_filename=media.original_filename, content_type=media.content_type,
-        size_bytes=media.size_bytes, width=media.width, height=media.height,
-        duration_seconds=media.duration_seconds, debate_id=media.debate_id,
-        public=media.public, created_at=media.created_at,
+        id=media.id,
+        kind=media.kind,
+        url=_media_url(media.id),
+        original_filename=media.original_filename,
+        content_type=media.content_type,
+        size_bytes=media.size_bytes,
+        width=media.width,
+        height=media.height,
+        duration_seconds=media.duration_seconds,
+        debate_id=media.debate_id,
+        public=media.public,
+        created_at=media.created_at,
     )
 
 
-async def _can_access(db: AsyncSession, media: Media, user: Optional[User]) -> bool:
+async def _can_access(db: AsyncSession, media: Media, user: User | None) -> bool:
     if media.public:
         return True
     if user is None:
@@ -50,12 +57,14 @@ async def _can_access(db: AsyncSession, media: Media, user: Optional[User]) -> b
     if media.owner_id == user.id:
         return True
     if media.debate_id:
-        participant = (await db.execute(
-            select(DebateParticipant).where(
-                DebateParticipant.debate_id == media.debate_id,
-                DebateParticipant.user_id == user.id,
+        participant = (
+            await db.execute(
+                select(DebateParticipant).where(
+                    DebateParticipant.debate_id == media.debate_id,
+                    DebateParticipant.user_id == user.id,
+                )
             )
-        )).scalar_one_or_none()
+        ).scalar_one_or_none()
         if participant is not None:
             return True
         debate = await db.get(Debate, media.debate_id)
@@ -68,15 +77,16 @@ async def _can_access(db: AsyncSession, media: Media, user: Optional[User]) -> b
 async def upload_media(
     file: UploadFile = File(...),
     kind: str = Form("image"),
-    debate_id: Optional[uuid.UUID] = Form(None),
+    debate_id: uuid.UUID | None = Form(None),
     public: bool = Form(True),
-    duration_seconds: Optional[float] = Form(None),
+    duration_seconds: float | None = Form(None),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload an image or video, optionally attached to a debate."""
     if kind not in ("image", "video"):
         from app.core.exceptions import ValidationError
+
         raise ValidationError("Upload kind must be 'image' or 'video'.")
 
     is_public = public
@@ -88,8 +98,12 @@ async def upload_media(
         is_public = public and debate.is_public
 
     meta = await media_service.save_upload(
-        file, kind=kind, owner_id=user.id, debate_id=debate_id,
-        public=is_public, duration_seconds=duration_seconds,
+        file,
+        kind=kind,
+        owner_id=user.id,
+        debate_id=debate_id,
+        public=is_public,
+        duration_seconds=duration_seconds,
     )
     media = Media(**meta)
     db.add(media)
@@ -105,11 +119,15 @@ async def upload_avatar(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload (or replace) the caller's profile picture."""
-    meta = await media_service.save_upload(file, kind="avatar", owner_id=user.id, public=True)
+    meta = await media_service.save_upload(
+        file, kind="avatar", owner_id=user.id, public=True
+    )
     media = Media(**meta)
     db.add(media)
 
-    profile = (await db.execute(select(Profile).where(Profile.user_id == user.id))).scalar_one_or_none()
+    profile = (
+        await db.execute(select(Profile).where(Profile.user_id == user.id))
+    ).scalar_one_or_none()
     if profile is None:
         profile = Profile(user_id=user.id)
         db.add(profile)
@@ -123,7 +141,7 @@ async def upload_avatar(
 @router.get("/{media_id}")
 async def get_media(
     media_id: uuid.UUID,
-    user: Optional[User] = Depends(get_optional_user),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     media = await db.get(Media, media_id)
@@ -149,11 +167,14 @@ async def delete_media(
         raise AuthorizationError("You can only remove your own uploads.")
     try:
         import os
+
         os.remove(media_service.absolute_path(media.file_path))
     except OSError:
         pass
     if media.kind == "avatar":
-        profile = (await db.execute(select(Profile).where(Profile.user_id == user.id))).scalar_one_or_none()
+        profile = (
+            await db.execute(select(Profile).where(Profile.user_id == user.id))
+        ).scalar_one_or_none()
         if profile is not None and profile.avatar_url == _media_url(media.id):
             profile.avatar_url = None
     await db.delete(media)

@@ -4,9 +4,10 @@ PostgreSQL is the authoritative store for all persistent records, especially
 financial ones. Redis is used only for caching / rate limiting / ephemeral
 data (see `app/core/redis.py`).
 """
+
 from __future__ import annotations
 
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,

@@ -3,11 +3,11 @@
 Passwords are hashed and never exposed. Brute-force protection locks an account
 after repeated failures. Security events are audited.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,8 +30,8 @@ from app.core.security import (
 )
 from app.models.base import UserRole, UserStatus
 from app.models.user import Profile, User, UserPreferences
-from app.services.audit_service import record_audit
 from app.services import notification_service
+from app.services.audit_service import record_audit
 
 
 def _now() -> datetime:
@@ -51,9 +51,9 @@ async def register(
     password: str,
     confirm_password: str,
     accept_terms: bool,
-    phone: Optional[str] = None,
-    country_code: Optional[str] = None,
-    ip_address: Optional[str] = None,
+    phone: str | None = None,
+    country_code: str | None = None,
+    ip_address: str | None = None,
 ) -> User:
     if password != confirm_password:
         raise ValidationError("Passwords do not match.")
@@ -81,11 +81,17 @@ async def register(
     db.add(Profile(user_id=user.id, display_name=username))
     db.add(UserPreferences(user_id=user.id))
     await record_audit(
-        db, "account_creation", actor_id=user.id, entity_type="user",
-        entity_id=str(user.id), ip_address=ip_address,
+        db,
+        "account_creation",
+        actor_id=user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+        ip_address=ip_address,
     )
     await notification_service.notify(
-        db, user.id, "Welcome to Debate_Settler 👋",
+        db,
+        user.id,
+        "Welcome to Debate_Settler 👋",
         "Create a debate, join one, or vote in a local debate to get started.",
         category="onboarding",
     )
@@ -94,9 +100,13 @@ async def register(
 
 
 async def authenticate(
-    db: AsyncSession, identifier: str, password: str, *, ip_address: Optional[str] = None,
-    user_agent: Optional[str] = None,
-) -> Tuple[User, str, str]:
+    db: AsyncSession,
+    identifier: str,
+    password: str,
+    *,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[User, str, str]:
     # Simple per-identifier rate limit to blunt brute-force attempts.
     rl_key = f"login:{identifier.lower()}"
     attempts = await incr_rate_limit(rl_key, 60)
@@ -104,12 +114,19 @@ async def authenticate(
         raise AccountLockedError()
 
     result = await db.execute(
-        select(User).where(or_(User.username.ilike(identifier), User.email.ilike(identifier.lower())))
+        select(User).where(
+            or_(User.username.ilike(identifier), User.email.ilike(identifier.lower()))
+        )
     )
     user = result.scalar_one_or_none()
     if user is None:
-        await record_audit(db, "login_failed", entity_type="user", ip_address=ip_address,
-                           details={"identifier": identifier, "reason": "unknown_account"})
+        await record_audit(
+            db,
+            "login_failed",
+            entity_type="user",
+            ip_address=ip_address,
+            details={"identifier": identifier, "reason": "unknown_account"},
+        )
         raise AuthenticationError("Incorrect username/email or password.")
 
     if user.is_locked():
@@ -121,12 +138,26 @@ async def authenticate(
         user.failed_login_attempts += 1
         if user.failed_login_attempts >= settings.MAX_LOGIN_ATTEMPTS:
             user.status = UserStatus.locked
-            user.locked_until = _now() + timedelta(minutes=settings.ACCOUNT_LOCKOUT_MINUTES)
+            user.locked_until = _now() + timedelta(
+                minutes=settings.ACCOUNT_LOCKOUT_MINUTES
+            )
             user.failed_login_attempts = 0
-            await record_audit(db, "account_locked", actor_id=user.id, entity_type="user",
-                               entity_id=str(user.id), ip_address=ip_address)
-        await record_audit(db, "login_failed", actor_id=user.id, entity_type="user",
-                           entity_id=str(user.id), ip_address=ip_address)
+            await record_audit(
+                db,
+                "account_locked",
+                actor_id=user.id,
+                entity_type="user",
+                entity_id=str(user.id),
+                ip_address=ip_address,
+            )
+        await record_audit(
+            db,
+            "login_failed",
+            actor_id=user.id,
+            entity_type="user",
+            entity_id=str(user.id),
+            ip_address=ip_address,
+        )
         await db.flush()
         raise AuthenticationError("Incorrect username/email or password.")
 
@@ -135,8 +166,14 @@ async def authenticate(
     user.status = UserStatus.active
     user.locked_until = None
     await cache_delete(rl_key)
-    await record_audit(db, "login", actor_id=user.id, entity_type="user",
-                       entity_id=str(user.id), ip_address=ip_address)
+    await record_audit(
+        db,
+        "login",
+        actor_id=user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+        ip_address=ip_address,
+    )
     await db.flush()
 
     access = create_access_token(str(user.id), extra={"role": user.role.value})
@@ -150,7 +187,13 @@ async def change_password(db: AsyncSession, user: User, current: str, new: str) 
     if len(new) < 8:
         raise ValidationError("Password must be at least 8 characters.")
     user.hashed_password = hash_password(new)
-    await record_audit(db, "password_change", actor_id=user.id, entity_type="user", entity_id=str(user.id))
+    await record_audit(
+        db,
+        "password_change",
+        actor_id=user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+    )
     await db.flush()
 
 
@@ -162,7 +205,13 @@ async def request_password_reset(db: AsyncSession, email: str) -> str:
         return ""
     token = generate_token_urlsafe(32)
     await cache_set(f"pwd_reset:{token}", str(user.id), ttl_seconds=3600)
-    await record_audit(db, "password_reset_requested", actor_id=user.id, entity_type="user", entity_id=str(user.id))
+    await record_audit(
+        db,
+        "password_reset_requested",
+        actor_id=user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+    )
     return token
 
 
@@ -180,7 +229,13 @@ async def reset_password(db: AsyncSession, token: str, new_password: str) -> Non
     user.locked_until = None
     user.failed_login_attempts = 0
     await cache_delete(f"pwd_reset:{token}")
-    await record_audit(db, "password_reset", actor_id=user.id, entity_type="user", entity_id=str(user.id))
+    await record_audit(
+        db,
+        "password_reset",
+        actor_id=user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+    )
     await db.flush()
 
 
@@ -199,6 +254,12 @@ async def verify_email(db: AsyncSession, token: str) -> User:
         raise NotFoundError("Account not found.")
     user.email_verified = True
     await cache_delete(f"email_verify:{token}")
-    await record_audit(db, "email_verified", actor_id=user.id, entity_type="user", entity_id=str(user.id))
+    await record_audit(
+        db,
+        "email_verified",
+        actor_id=user.id,
+        entity_type="user",
+        entity_id=str(user.id),
+    )
     await db.flush()
     return user

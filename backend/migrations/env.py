@@ -3,6 +3,7 @@
 Uses the synchronous database URL (Alembic runs migrations synchronously) and
 imports all models so autogenerate sees the full metadata.
 """
+
 from __future__ import annotations
 
 from logging.config import fileConfig

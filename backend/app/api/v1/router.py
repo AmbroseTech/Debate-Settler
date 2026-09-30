@@ -1,8 +1,9 @@
 """API v1 router aggregator + invitation QR helper."""
+
 from __future__ import annotations
 
-import io
 import base64
+import io
 
 import qrcode
 from fastapi import APIRouter, Query

@@ -1,4 +1,5 @@
 """Schema exports."""
+
 from app.schemas.auth import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
@@ -10,11 +11,11 @@ from app.schemas.auth import (
     TokenResponse,
     UpdatePreferencesRequest,
     UpdateProfileRequest,
+    UsernameCheckRequest,
+    UsernameCheckResponse,
     UserOut,
     UserPreferencesOut,
     UserPublic,
-    UsernameCheckRequest,
-    UsernameCheckResponse,
     VerifyEmailRequest,
 )
 from app.schemas.common import (

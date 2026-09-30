@@ -4,13 +4,13 @@ Ratings are computed with Elo and persisted in the database, so they survive
 restarts. A finished match applies its result exactly once — the caller guards
 with Game.resulted so duplicate submissions can never award points twice.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,7 +26,9 @@ def _expected(rating: int, opponent: int) -> float:
     return 1.0 / (1.0 + 10 ** ((opponent - rating) / 400.0))
 
 
-async def _get_or_create(db: AsyncSession, game_type, user_id: uuid.UUID) -> GameStanding:
+async def _get_or_create(
+    db: AsyncSession, game_type, user_id: uuid.UUID
+) -> GameStanding:
     standing = (
         await db.execute(
             select(GameStanding).where(
@@ -39,8 +41,15 @@ async def _get_or_create(db: AsyncSession, game_type, user_id: uuid.UUID) -> Gam
     try:
         async with db.begin_nested():
             standing = GameStanding(
-                game_type=game_type, user_id=user_id, rating=ELO_BASE,
-                matches=0, wins=0, losses=0, draws=0, current_streak=0, longest_streak=0,
+                game_type=game_type,
+                user_id=user_id,
+                rating=ELO_BASE,
+                matches=0,
+                wins=0,
+                losses=0,
+                draws=0,
+                current_streak=0,
+                longest_streak=0,
             )
             db.add(standing)
             await db.flush()
@@ -107,7 +116,7 @@ async def apply_result(db: AsyncSession, game: Game) -> None:
 
 async def leaderboard(
     db: AsyncSession, game_type, *, period: str = "all_time", limit: int = 50
-) -> List[dict]:
+) -> list[dict]:
     """Return ranked players. all_time uses persisted Elo standings; weekly /
     monthly recompute from matches finished in the window."""
     if period in ("weekly", "monthly"):
@@ -115,7 +124,9 @@ async def leaderboard(
 
     rows = (
         await db.execute(
-            select(GameStanding, User.username, Profile.display_name, Profile.avatar_url)
+            select(
+                GameStanding, User.username, Profile.display_name, Profile.avatar_url
+            )
             .join(User, User.id == GameStanding.user_id)
             .outerjoin(Profile, Profile.user_id == GameStanding.user_id)
             .where(GameStanding.game_type == game_type)
@@ -141,25 +152,33 @@ async def leaderboard(
     ]
 
 
-async def _period_board(db: AsyncSession, game_type, period: str, limit: int) -> List[dict]:
+async def _period_board(
+    db: AsyncSession, game_type, period: str, limit: int
+) -> list[dict]:
     days = 7 if period == "weekly" else 30
     since = datetime.now(timezone.utc) - timedelta(days=days)
     games = (
-        await db.execute(
-            select(Game).where(
-                Game.game_type == game_type,
-                Game.status == GameStatus.finished,
-                Game.created_at >= since,
-                Game.player_one_id.is_not(None),
-                Game.player_two_id.is_not(None),
+        (
+            await db.execute(
+                select(Game).where(
+                    Game.game_type == game_type,
+                    Game.status == GameStatus.finished,
+                    Game.created_at >= since,
+                    Game.player_one_id.is_not(None),
+                    Game.player_two_id.is_not(None),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     agg: dict[uuid.UUID, dict] = {}
     for g in games:
         for pid in (g.player_one_id, g.player_two_id):
-            entry = agg.setdefault(pid, {"matches": 0, "wins": 0, "losses": 0, "draws": 0})
+            entry = agg.setdefault(
+                pid, {"matches": 0, "wins": 0, "losses": 0, "draws": 0}
+            )
             entry["matches"] += 1
             if g.winner_id is None:
                 entry["draws"] += 1
@@ -182,7 +201,11 @@ async def _period_board(db: AsyncSession, game_type, period: str, limit: int) ->
 
     ranked = sorted(
         agg.items(),
-        key=lambda kv: (kv[1]["wins"], kv[1]["wins"] - kv[1]["losses"], kv[1]["matches"]),
+        key=lambda kv: (
+            kv[1]["wins"],
+            kv[1]["wins"] - kv[1]["losses"],
+            kv[1]["matches"],
+        ),
         reverse=True,
     )
     return [
@@ -195,7 +218,9 @@ async def _period_board(db: AsyncSession, game_type, period: str, limit: int) ->
             "wins": v["wins"],
             "losses": v["losses"],
             "draws": v["draws"],
-            "win_pct": round(v["wins"] * 100 / v["matches"], 1) if v["matches"] else 0.0,
+            "win_pct": round(v["wins"] * 100 / v["matches"], 1)
+            if v["matches"]
+            else 0.0,
             "current_streak": 0,
             "rating": None,
         }

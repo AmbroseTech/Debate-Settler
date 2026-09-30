@@ -3,10 +3,10 @@
 Creates in-app notifications immediately and enqueues email/SMS/push delivery
 through the background worker.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +24,7 @@ async def notify(
     body: str,
     *,
     category: str = "general",
-    link: Optional[str] = None,
+    link: str | None = None,
     channel: NotificationChannel = NotificationChannel.in_app,
 ) -> Notification:
     notification = Notification(
@@ -41,24 +41,35 @@ async def notify(
     return notification
 
 
-async def notify_debate_starting(db: AsyncSession, user_id: uuid.UUID, debate_question: str) -> None:
+async def notify_debate_starting(
+    db: AsyncSession, user_id: uuid.UUID, debate_question: str
+) -> None:
     await notify(
-        db, user_id, "Your debate is starting soon",
+        db,
+        user_id,
+        "Your debate is starting soon",
         f"“{debate_question}” starts shortly. Get ready!",
         category="debate",
     )
 
 
-async def notify_voting_open(db: AsyncSession, user_id: uuid.UUID, debate_question: str) -> None:
+async def notify_voting_open(
+    db: AsyncSession, user_id: uuid.UUID, debate_question: str
+) -> None:
     await notify(
-        db, user_id, "Voting is now open",
-        f"Cast your vote in “{debate_question}”.", category="debate",
+        db,
+        user_id,
+        "Voting is now open",
+        f"Cast your vote in “{debate_question}”.",
+        category="debate",
     )
 
 
 async def notify_settled(db: AsyncSession, user_id: uuid.UUID, message: str) -> None:
     await notify(
-        db, user_id, "Your debate has been settled",
-        message, category="settlement",
+        db,
+        user_id,
+        "Your debate has been settled",
+        message,
+        category="settlement",
     )
-

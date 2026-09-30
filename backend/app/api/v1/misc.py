@@ -1,17 +1,21 @@
 """Categories, notifications, disputes and games endpoints."""
+
 from __future__ import annotations
 
 import uuid
-from typing import List
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, get_optional_user, require_role
+from app.core.dependencies import get_current_user, require_role
 from app.core.exceptions import NotFoundError
-from app.models.base import DisputeStatus, GameStatus, GameType, NotificationChannel, UserRole
+from app.models.base import (
+    DisputeStatus,
+    GameType,
+    UserRole,
+)
 from app.models.category import Category
 from app.models.debate import Debate
 from app.models.notification import Dispute, Game, Notification
@@ -33,7 +37,7 @@ from app.schemas.misc import (
     MoveResultOut,
     NotificationOut,
 )
-from app.services import game_service, notification_service, ranking_service
+from app.services import game_service, ranking_service
 from app.services.audit_service import record_audit
 
 categories_router = APIRouter(prefix="/categories", tags=["categories"])
@@ -44,24 +48,39 @@ games_router = APIRouter(prefix="/games", tags=["games"])
 
 # --- Categories ---
 
-@categories_router.get("", response_model=List[CategoryOut])
+
+@categories_router.get("", response_model=list[CategoryOut])
 async def list_categories(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Category).where(Category.is_active.is_(True)).order_by(Category.sort_order))
+    result = await db.execute(
+        select(Category)
+        .where(Category.is_active.is_(True))
+        .order_by(Category.sort_order)
+    )
     return [CategoryOut.model_validate(c) for c in result.scalars().all()]
 
 
 # --- Notifications ---
 
-@notifications_router.get("", response_model=List[NotificationOut])
-async def list_notifications(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+
+@notifications_router.get("", response_model=list[NotificationOut])
+async def list_notifications(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
-        select(Notification).where(Notification.user_id == user.id).order_by(Notification.created_at.desc()).limit(100)
+        select(Notification)
+        .where(Notification.user_id == user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(100)
     )
     return [NotificationOut.model_validate(n) for n in result.scalars().all()]
 
 
 @notifications_router.post("/{notification_id}/read", response_model=Message)
-async def mark_read(notification_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def mark_read(
+    notification_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     n = await db.get(Notification, notification_id)
     if n is None or n.user_id != user.id:
         raise NotFoundError("Notification not found.")
@@ -71,8 +90,14 @@ async def mark_read(notification_id: uuid.UUID, user: User = Depends(get_current
 
 
 @notifications_router.post("/read-all", response_model=Message)
-async def mark_all_read(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Notification).where(Notification.user_id == user.id, Notification.read.is_(False)))
+async def mark_all_read(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(Notification).where(
+            Notification.user_id == user.id, Notification.read.is_(False)
+        )
+    )
     for n in result.scalars().all():
         n.read = True
     await db.commit()
@@ -81,15 +106,18 @@ async def mark_all_read(user: User = Depends(get_current_user), db: AsyncSession
 
 # --- Disputes (§23) ---
 
+
 @disputes_router.post("", response_model=DisputeOut, status_code=201)
-async def create_dispute(payload: DisputeCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def create_dispute(
+    payload: DisputeCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     debate = await db.get(Debate, payload.debate_id)
     if debate is None:
         raise NotFoundError("Debate not found.")
     participant = (
-        await db.execute(
-            select(User).where(User.id == user.id)
-        )
+        await db.execute(select(User).where(User.id == user.id))
     ).scalar_one()
     dispute = Dispute(
         debate_id=payload.debate_id,
@@ -99,20 +127,31 @@ async def create_dispute(payload: DisputeCreate, user: User = Depends(get_curren
         status=DisputeStatus.open,
     )
     db.add(dispute)
-    await record_audit(db, "dispute", actor_id=user.id, entity_type="debate", entity_id=str(debate.id))
+    await record_audit(
+        db, "dispute", actor_id=user.id, entity_type="debate", entity_id=str(debate.id)
+    )
     await db.commit()
     await db.refresh(dispute)
     return DisputeOut.model_validate(dispute)
 
 
-@disputes_router.get("/mine", response_model=List[DisputeOut])
-async def my_disputes(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Dispute).where(Dispute.raised_by == user.id).order_by(Dispute.created_at.desc()))
+@disputes_router.get("/mine", response_model=list[DisputeOut])
+async def my_disputes(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(Dispute)
+        .where(Dispute.raised_by == user.id)
+        .order_by(Dispute.created_at.desc())
+    )
     return [DisputeOut.model_validate(d) for d in result.scalars().all()]
 
 
-@disputes_router.get("", response_model=List[DisputeOut])
-async def all_disputes(admin: User = Depends(require_role(UserRole.moderator)), db: AsyncSession = Depends(get_db)):
+@disputes_router.get("", response_model=list[DisputeOut])
+async def all_disputes(
+    admin: User = Depends(require_role(UserRole.moderator)),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Dispute).order_by(Dispute.created_at.desc()))
     return [DisputeOut.model_validate(d) for d in result.scalars().all()]
 
@@ -133,8 +172,14 @@ async def resolve_dispute(
     from datetime import datetime, timezone
 
     dispute.resolved_at = datetime.now(timezone.utc)
-    await record_audit(db, "dispute_resolved", actor_id=admin.id, entity_type="dispute", entity_id=str(dispute.id),
-                       details={"status": payload.status.value})
+    await record_audit(
+        db,
+        "dispute_resolved",
+        actor_id=admin.id,
+        entity_type="dispute",
+        entity_id=str(dispute.id),
+        details={"status": payload.status.value},
+    )
     await db.commit()
     await db.refresh(dispute)
     return DisputeOut.model_validate(dispute)
@@ -142,25 +187,32 @@ async def resolve_dispute(
 
 # --- Games (§51, §6, §7, §8) — free play by default ---
 
+
 @games_router.post("", response_model=GameOut, status_code=201)
-async def create_game(payload: GameCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def create_game(
+    payload: GameCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     game = await game_service.create_match(db, user, payload.game_type)
     await db.commit()
     await db.refresh(game)
     return GameOut.model_validate(game)
 
 
-@games_router.get("", response_model=List[GameOut])
-async def list_games(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+@games_router.get("", response_model=list[GameOut])
+async def list_games(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
-        select(Game).where(
-            (Game.player_one_id == user.id) | (Game.player_two_id == user.id)
-        ).order_by(Game.created_at.desc())
+        select(Game)
+        .where((Game.player_one_id == user.id) | (Game.player_two_id == user.id))
+        .order_by(Game.created_at.desc())
     )
     return [GameOut.model_validate(g) for g in result.scalars().all()]
 
 
-@games_router.get("/types", response_model=List[str])
+@games_router.get("/types", response_model=list[str])
 async def game_types():
     return [g.value for g in GameType]
 
@@ -177,16 +229,24 @@ async def game_leaderboard(
 
 @games_router.post("/challenge", response_model=GameInvitationOut, status_code=201)
 async def challenge_player(
-    payload: ChallengeRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    payload: ChallengeRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     game = await game_service.create_match(db, user, payload.game_type)
-    invitation = await game_service.create_invitation(db, game, user, payload.to_username)
+    invitation = await game_service.create_invitation(
+        db, game, user, payload.to_username
+    )
     await db.commit()
     url = await game_service.invite_url(invitation.token)
     return GameInvitationOut(
-        token=invitation.token, game_id=game.id, game_type=game.game_type,
-        status=invitation.status, to_username=invitation.to_username,
-        expires_at=invitation.expires_at, invite_url=url,
+        token=invitation.token,
+        game_id=game.id,
+        game_type=game.game_type,
+        status=invitation.status,
+        to_username=invitation.to_username,
+        expires_at=invitation.expires_at,
+        invite_url=url,
     )
 
 
@@ -198,7 +258,9 @@ async def game_invitation_preview(token: str, db: AsyncSession = Depends(get_db)
 
 @games_router.post("/invitations/accept", response_model=MatchStateOut)
 async def game_invitation_accept(
-    token: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    token: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     game = await game_service.accept_invitation(db, token, user)
     view = await game_service.match_view(db, game, user)
@@ -208,7 +270,9 @@ async def game_invitation_accept(
 
 @games_router.post("/invitations/decline", response_model=Message)
 async def game_invitation_decline(
-    token: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    token: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     await game_service.decline_invitation(db, token, user)
     await db.commit()
@@ -217,7 +281,9 @@ async def game_invitation_decline(
 
 @games_router.get("/{game_id}", response_model=MatchStateOut)
 async def get_match(
-    game_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    game_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     game = await game_service.get_match(db, game_id, user)
     view = await game_service.match_view(db, game, user)
@@ -226,8 +292,10 @@ async def get_match(
 
 @games_router.post("/{game_id}/move", response_model=MoveResultOut)
 async def make_move(
-    game_id: uuid.UUID, payload: MoveRequest,
-    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    game_id: uuid.UUID,
+    payload: MoveRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     game = await game_service.get_match(db, game_id, user)
     game, message = await game_service.make_move(db, game, user, payload.cell)

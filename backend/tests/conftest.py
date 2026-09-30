@@ -1,10 +1,10 @@
 """Pytest fixtures: in-memory SQLite DB, async client, seeded users."""
+
 from __future__ import annotations
 
 import asyncio
 import os
-import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -15,12 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 # These must be set BEFORE any `app` module is imported (settings load at import time).
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
-from app.core.database import Base, engine, get_db  # noqa: E402
-from app.main import app  # noqa: E402
-from app.core.security import hash_password  # noqa: E402
-from app.models.base import UserRole  # noqa: E402
-from app.models.user import Profile, User, UserPreferences  # noqa: E402
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: E402
+from app.core.database import Base, engine, get_db
+from app.core.security import hash_password
+from app.main import app
+from app.models.base import UserRole
+from app.models.user import Profile, User, UserPreferences
 
 
 @pytest.fixture(scope="session")
@@ -30,7 +29,9 @@ def event_loop():
     loop.close()
 
 
-TestSession = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+TestSession = async_sessionmaker(
+    bind=engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 @pytest_asyncio.fixture

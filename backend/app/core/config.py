@@ -6,11 +6,12 @@ ever hard-coded. See `.env.example` at the repository root for the full list.
 Debate Settler is a free social platform — there are no payment providers,
 wallets, currencies, platform fees or any financial settings.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, List
+from typing import Annotated
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -51,7 +52,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
-    CORS_ORIGINS: Annotated[List[str], NoDecode] = Field(
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"]
     )
     # Rate limiting
@@ -67,10 +68,10 @@ class Settings(BaseSettings):
     # --- Media storage ---
     MEDIA_ROOT: str = "media"
     MAX_IMAGE_UPLOAD_MB: int = 8
-    ALLOWED_IMAGE_TYPES: List[str] = Field(
+    ALLOWED_IMAGE_TYPES: list[str] = Field(
         default_factory=lambda: ["image/jpeg", "image/png", "image/webp", "image/gif"]
     )
-    ALLOWED_VIDEO_TYPES: List[str] = Field(
+    ALLOWED_VIDEO_TYPES: list[str] = Field(
         default_factory=lambda: ["video/mp4", "video/webm", "video/quicktime"]
     )
 

@@ -1,4 +1,5 @@
 """Common model base: UUID primary keys, timestamps, enums shared across models."""
+
 from __future__ import annotations
 
 import enum
@@ -42,6 +43,7 @@ class BaseModel(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 # --- Enums -----------------------------------------------------------------
 
+
 class UserRole(str, enum.Enum):
     user = "user"
     moderator = "moderator"
@@ -62,12 +64,12 @@ class DebateMode(str, enum.Enum):
 
 class DebateStatus(str, enum.Enum):
     draft = "draft"
-    open = "open"                       # waiting for opponent
-    active = "active"                    # both sides confirmed, funded
-    voting = "voting"                    # local: voting window open
+    open = "open"  # waiting for opponent
+    active = "active"  # both sides confirmed, funded
+    voting = "voting"  # local: voting window open
     closing_soon = "closing_soon"
-    closed = "closed"                    # no more votes / event passed
-    being_verified = "being_verified"    # online: awaiting result
+    closed = "closed"  # no more votes / event passed
+    being_verified = "being_verified"  # online: awaiting result
     settled = "settled"
     draw = "draw"
     disputed = "disputed"

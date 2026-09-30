@@ -3,6 +3,7 @@
 Wires up CORS, secure headers, exception handling, the v1 router and lifespan
 events (logging config, Redis pool, startup checks).
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -55,7 +56,9 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "geolocation=(self), camera=(), microphone=()"
+    response.headers["Permissions-Policy"] = (
+        "geolocation=(self), camera=(), microphone=()"
+    )
     return response
 
 
@@ -64,7 +67,13 @@ async def app_error_handler(request: Request, exc: AppError):
     logger.warning("app_error", code=exc.code, status=exc.status_code, **exc.context)
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": {"code": exc.code, "message": exc.user_message, "context": exc.context or None}},
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.user_message,
+                "context": exc.context or None,
+            }
+        },
     )
 
 
@@ -74,7 +83,12 @@ async def unhandled_error_handler(request: Request, exc: Exception):
     logger.error("unhandled_error", error=str(exc), exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"error": {"code": "internal_error", "message": "Something went wrong. Please try again."}},
+        content={
+            "error": {
+                "code": "internal_error",
+                "message": "Something went wrong. Please try again.",
+            }
+        },
     )
 
 

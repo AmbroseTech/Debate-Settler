@@ -1,7 +1,8 @@
 """Auth endpoints (/api/v1/auth)."""
+
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -17,9 +18,9 @@ from app.schemas.auth import (
     RegisterRequest,
     ResetPasswordRequest,
     TokenResponse,
-    UserOut,
     UsernameCheckRequest,
     UsernameCheckResponse,
+    UserOut,
     VerifyEmailRequest,
 )
 from app.schemas.common import Message
@@ -29,7 +30,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
-async def register(payload: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def register(
+    payload: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)
+):
     user = await auth_service.register(
         db,
         username=payload.username,
@@ -47,15 +50,20 @@ async def register(payload: RegisterRequest, request: Request, db: AsyncSession 
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(
+    payload: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)
+):
     _user, access, refresh = await auth_service.authenticate(
-        db, payload.identifier, payload.password,
+        db,
+        payload.identifier,
+        payload.password,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
     await db.commit()
     return TokenResponse(
-        access_token=access, refresh_token=refresh,
+        access_token=access,
+        refresh_token=refresh,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
@@ -84,13 +92,17 @@ async def logout(user: User = Depends(get_current_user)):
 
 
 @router.post("/username-check", response_model=UsernameCheckResponse)
-async def username_check(payload: UsernameCheckRequest, db: AsyncSession = Depends(get_db)):
+async def username_check(
+    payload: UsernameCheckRequest, db: AsyncSession = Depends(get_db)
+):
     available = await auth_service.username_available(db, payload.username)
     return UsernameCheckResponse(available=available)
 
 
 @router.post("/forgot-password", response_model=Message)
-async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+async def forgot_password(
+    payload: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)
+):
     token = await auth_service.request_password_reset(db, payload.email)
     await db.commit()
     # In production the token is emailed, never returned. In dev we surface it.
@@ -101,7 +113,9 @@ async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Dep
 
 
 @router.post("/reset-password", response_model=Message)
-async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+async def reset_password(
+    payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)
+):
     await auth_service.reset_password(db, payload.token, payload.new_password)
     await db.commit()
     return Message(message="Your password has been reset. You can now sign in.")
@@ -120,7 +134,9 @@ async def change_password(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await auth_service.change_password(db, user, payload.current_password, payload.new_password)
+    await auth_service.change_password(
+        db, user, payload.current_password, payload.new_password
+    )
     await db.commit()
     return Message(message="Your password has been changed.")
 

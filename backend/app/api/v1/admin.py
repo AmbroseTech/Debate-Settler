@@ -3,10 +3,10 @@
 Sensitive moderation actions require moderator/admin role. Admins can submit a
 verified result for online debates and manage disputes/users.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -29,15 +29,27 @@ from app.schemas.misc import AdminStats, SettlementSubmit
 from app.services.audit_service import record_audit
 from app.settlements import engine
 
-router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_role(UserRole.admin))])
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_role(UserRole.admin))],
+)
 
 
 @router.get("/stats", response_model=AdminStats)
 async def stats(db: AsyncSession = Depends(get_db)):
     users = (await db.execute(select(func.count(User.id)))).scalar_one()
     debates = (await db.execute(select(func.count(Debate.id)))).scalar_one()
-    local = (await db.execute(select(func.count(Debate.id)).where(Debate.mode == DebateMode.local))).scalar_one()
-    online = (await db.execute(select(func.count(Debate.id)).where(Debate.mode == DebateMode.online))).scalar_one()
+    local = (
+        await db.execute(
+            select(func.count(Debate.id)).where(Debate.mode == DebateMode.local)
+        )
+    ).scalar_one()
+    online = (
+        await db.execute(
+            select(func.count(Debate.id)).where(Debate.mode == DebateMode.online)
+        )
+    ).scalar_one()
     votes = (await db.execute(select(func.count(DebateVote.id)))).scalar_one()
     open_disputes = (
         await db.execute(
@@ -48,43 +60,68 @@ async def stats(db: AsyncSession = Depends(get_db)):
     ).scalar_one()
 
     return AdminStats(
-        users=users, debates=debates, local_debates=local, online_debates=online,
-        votes=votes, open_disputes=open_disputes,
+        users=users,
+        debates=debates,
+        local_debates=local,
+        online_debates=online,
+        votes=votes,
+        open_disputes=open_disputes,
     )
 
 
-@router.get("/users", response_model=List[dict])
+@router.get("/users", response_model=list[dict])
 async def list_users(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).order_by(User.created_at.desc()).limit(200))
     return [
         {
-            "id": str(u.id), "username": u.username, "email": u.email,
-            "role": u.role.value, "status": u.status.value,
-            "email_verified": u.email_verified, "created_at": u.created_at,
+            "id": str(u.id),
+            "username": u.username,
+            "email": u.email,
+            "role": u.role.value,
+            "status": u.status.value,
+            "email_verified": u.email_verified,
+            "created_at": u.created_at,
         }
         for u in result.scalars().all()
     ]
 
 
 @router.post("/users/{user_id}/role", response_model=Message)
-async def set_role(user_id: uuid.UUID, role: UserRole, admin: User = Depends(require_role(UserRole.admin)), db: AsyncSession = Depends(get_db)):
+async def set_role(
+    user_id: uuid.UUID,
+    role: UserRole,
+    admin: User = Depends(require_role(UserRole.admin)),
+    db: AsyncSession = Depends(get_db),
+):
     user = await db.get(User, user_id)
     if user is None:
         raise NotFoundError("User not found.")
     user.role = role
-    await record_audit(db, "admin_action", actor_id=admin.id, entity_type="user", entity_id=str(user_id),
-                       details={"set_role": role.value})
+    await record_audit(
+        db,
+        "admin_action",
+        actor_id=admin.id,
+        entity_type="user",
+        entity_id=str(user_id),
+        details={"set_role": role.value},
+    )
     await db.commit()
     return Message(message=f"Role updated to {role.value}.")
 
 
 @router.post("/users/{user_id}/freeze", response_model=Message)
-async def freeze_user(user_id: uuid.UUID, admin: User = Depends(require_role(UserRole.admin)), db: AsyncSession = Depends(get_db)):
+async def freeze_user(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_role(UserRole.admin)),
+    db: AsyncSession = Depends(get_db),
+):
     user = await db.get(User, user_id)
     if user is None:
         raise NotFoundError("User not found.")
     user.status = UserStatus.frozen
-    await record_audit(db, "user_freeze", actor_id=admin.id, entity_type="user", entity_id=str(user_id))
+    await record_audit(
+        db, "user_freeze", actor_id=admin.id, entity_type="user", entity_id=str(user_id)
+    )
     await db.commit()
     return Message(message="User account frozen.")
 
@@ -100,25 +137,43 @@ async def submit_settlement(
     if debate is None:
         raise NotFoundError("Debate not found.")
     await engine.settle_debate(
-        db, debate, payload.winner_side,
+        db,
+        debate,
+        payload.winner_side,
         source_verified=payload.source_verified,
         settlement_source=payload.settlement_source,
         reason=payload.reason,
     )
-    await record_audit(db, "settlement", actor_id=admin.id, entity_type="debate", entity_id=str(debate.id),
-                       details={"winner_side": payload.winner_side, "source_verified": payload.source_verified})
+    await record_audit(
+        db,
+        "settlement",
+        actor_id=admin.id,
+        entity_type="debate",
+        entity_id=str(debate.id),
+        details={
+            "winner_side": payload.winner_side,
+            "source_verified": payload.source_verified,
+        },
+    )
     await db.commit()
     return Message(message="Settlement recorded.")
 
 
-@router.get("/audit-logs", response_model=List[dict])
+@router.get("/audit-logs", response_model=list[dict])
 async def audit_logs(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(200))
+    result = await db.execute(
+        select(AuditLog).order_by(AuditLog.created_at.desc()).limit(200)
+    )
     return [
         {
-            "id": str(a.id), "action": a.action, "entity_type": a.entity_type,
-            "entity_id": a.entity_id, "actor_id": str(a.actor_id) if a.actor_id else None,
-            "details": a.details, "created_at": a.created_at, "entry_hash": a.entry_hash,
+            "id": str(a.id),
+            "action": a.action,
+            "entity_type": a.entity_type,
+            "entity_id": a.entity_id,
+            "actor_id": str(a.actor_id) if a.actor_id else None,
+            "details": a.details,
+            "created_at": a.created_at,
+            "entry_hash": a.entry_hash,
         }
         for a in result.scalars().all()
     ]

@@ -1,9 +1,9 @@
 """Media upload schemas."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -17,9 +17,9 @@ class MediaOut(BaseModel):
     original_filename: str
     content_type: str
     size_bytes: int
-    width: Optional[int] = None
-    height: Optional[int] = None
-    duration_seconds: Optional[float] = None
-    debate_id: Optional[uuid.UUID] = None
+    width: int | None = None
+    height: int | None = None
+    duration_seconds: float | None = None
+    debate_id: uuid.UUID | None = None
     public: bool = True
     created_at: datetime
